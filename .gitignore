@@ -6,6 +6,10 @@ codeplugs/
 codecs/
 **/factory-backup/
 **/*firmware-dump*
+*.rdt
+*.dfu
+/hardware/libresdr/uhd-find.txt
+/hardware/libresdr/uhd-probe.txt
 
 # Large RF captures and model files: keep manifests/hashes, not binary payloads
 *.iq
