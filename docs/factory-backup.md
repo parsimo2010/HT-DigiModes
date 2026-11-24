@@ -17,3 +17,7 @@ Get-FileHash -Algorithm SHA256 -LiteralPath 'C:\path\outside\repo\original.rdt'
 ```
 
 Keep the [recovery gates](../notes/gates.md) open until the corresponding evidence exists. Record only sanitized status in the public repo.
+
+## Stock DM-1701 limitation
+
+RadioFoundry's generic stock-backup instructions only apply to selected radios. Its [pinned DM-1701 board configuration](https://github.com/RadioFoundry/RadioFoundry/blob/bac4b209cd8ade5de3040ed7df11753b9e0ceacc/boards/dm1701/board.toml) declares stock backup unavailable. Do not install replacement firmware to gain access to a backup tool. For now, plan for a standalone factory codeplug export and a separate, version-matched vendor recovery package. Neither proves a full copy of the installed firmware or unit-specific calibration.
