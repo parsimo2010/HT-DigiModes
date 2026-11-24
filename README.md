@@ -4,7 +4,18 @@ A research lab to develop standalone M17 on a Baofeng DM-1701 and host-assisted 
 
 **Start here:** [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md) and [`AGENTS.md`](AGENTS.md).
 
-**Status:** Planning only. No radios flashed, probed, or measured as part of this repository. Human at bench is required for RF and flash operations.
+**Status:** Starter scaffolding. Windows enumerated the DM-1701 over USB, but no radio protocol, RF, or flash tests have been run. See the [arrival log](notes/arrival-session.md).
+
+## Host-only quick start
+
+From the checkout root, run with Python 3.8+ (use `python` on Windows).
+
+```bash
+python3 scripts/lab.py status
+python3 -m unittest discover -s tests -v
+```
+
+See the [factory backup checklist](docs/factory-backup.md) and [LibreSDR host inventory](docs/libresdr-inventory.md) for next steps. Keep backup artifacts and unit identifiers outside this public repository.
 
 **For Codex:** Follow the first-session task in section 12 of the plan. Do software-only setup and testing, then request measured hardware facts. Do not claim the plan has been executed.
 
