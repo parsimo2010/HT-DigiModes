@@ -1,0 +1,35 @@
+# User-private information and hardware backups
+private/
+backups/
+calibration/
+codeplugs/
+codecs/
+**/factory-backup/
+**/*firmware-dump*
+
+# Large RF captures and model files: keep manifests/hashes, not binary payloads
+*.iq
+*.cfile
+*.cf32
+*.raw
+*.wav
+*.s16
+*.int16
+*.pth
+*.pt
+*.bin
+*.zip
+
+# External clone checkouts, toolchains, and generated data
+external/
+.venv/
+venv/
+build/
+dist/
+__pycache__/
+.pytest_cache/
+*.pyc
+.DS_Store
+
+# Never commit logs that could contain device serial numbers/private IDs
+*.log

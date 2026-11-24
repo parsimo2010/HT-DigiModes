@@ -1,0 +1,24 @@
+# Example only; replace placeholders with real observations, not guesses.
+test_id: "LAB-007-run-001"
+utc_time: "UNMEASURED"
+status: "planned"  # planned | measured | simulated | blocked
+purpose: "analog FM baseline"
+tx_radio_alias: "dm1701-a"
+rx_device_alias: "libresdr-a"
+firmware_revision: "UNVERIFIED"
+frequency_hz: null
+channel_bandwidth_hz: null
+rf_power_setting: "UNVERIFIED"
+sdr_sample_rate: null
+sdr_gain_db: null
+uhd_version: "UNVERIFIED"
+fpga_image_sha256: "UNVERIFIED"
+load_rating_w: null
+attenuation_db: null
+worst_case_sdr_input_dbm: null
+sdr_input_limit_dbm: null
+rf_connection_human_approved: false
+capture_sha256: null
+capture_external_path: null
+observations: []
+errors: []
