@@ -20,6 +20,11 @@
 - The DfuSe binary is 844,093 bytes. dmrconf decoded it offline, and both files have verified SHA-256 hashes in a private manifest. No backup contents or unit-specific identifiers are in Git.
 - The file covers two codeplug data ranges, not the installed MCU firmware or factory SPI security registers. The documented working calibration window within the file was all zero, so there is no usable calibration backup from this read. No write, flash, or RF test was run.
 
+## DM-1701 factory DFU readback check
+
+- On 2026-11-24 local time, after the operator put the DM-1701 in DFU and approved the read, verified the factory bootloader descriptor and used dfu-util 0.11 to upload 2 KiB from the advertised application base. The tool reported success, but it returned two identical 1 KiB blocks with a reset vector into the bootloader region. The result matched neither archived V02.06 candidate's application start.
+- The probe bytes and SHA-256 report are private. This is evidence of a failed **application** read, not an installed firmware dump. USB sharing was removed. No flash write, erase, unlock, or calibration command was sent.
+
 ## Remaining arrival checklist
 
 - DM-1701 exact marking/FCC ID (private attachment):
