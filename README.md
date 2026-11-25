@@ -1,10 +1,10 @@
-# Ham Digital Modes Lab — Codex starter
+# Ham Digital Modes Lab
 
 A research lab to develop standalone M17 on a Baofeng DM-1701 and host-assisted RADE BBFM on a verified compatible handheld, using a LibreSDR reference station. The second radio is confirmed as a DM-1801 Pro, but its board revision and cable still need verification.
 
-**Start here:** [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md) and [`AGENTS.md`](AGENTS.md).
+**Live-air testing is underway.** On 425.525 MHz the DM-1701 sent six M17 data frames to the LibreSDR. GNU Radio decoded all 96 expected bytes. The handheld runs the personalized RadioFoundry PTT build. Radioddity V02.03 CSV is its tested stock fallback. [Bench report and measurements](notes/dm1701-m17-first-rf.md).
 
-**Status:** The operator confirmed that the DM-1701 boots and works after installing Radioddity V02.03 CSV. Its menu reports `V002.003`. This is the tested stock fallback for this unit. M17 has not been tested on the radio. See the [arrival log](notes/arrival-session.md).
+**Next session on native Linux.** Bring the private transfer archive, replay the known recording, then work toward receiving an SDR-generated burst on the handheld. The handoff includes the package list, qualified SDR images, commands and expected payload hash. [Next-session handoff](notes/next-session.md) · [Development plan](docs/DEVELOPMENT_PLAN.md) · [Lab instructions](AGENTS.md).
 
 ## Host-only quick start
 
@@ -15,8 +15,6 @@ python3 scripts/lab.py status
 python3 -m unittest discover -s tests -v
 ```
 
-See the [factory backup checklist](docs/factory-backup.md) and [LibreSDR host inventory](docs/libresdr-inventory.md) for next steps. Keep backup artifacts and unit identifiers outside this public repository.
-
-**DM-1701 development:** The [GNU Radio loopback and reference vectors](notes/m17-reference.md) and [pinned baseline build and host tests](notes/dm1701-build.md) passed on the computer. The [bench handoff](notes/dm1701-bench.md) records the exact offline memory preview and open SDR, RF and calibration gates.
+The [GNU Radio reference vectors](notes/m17-reference.md), [RadioFoundry build](notes/dm1701-build.md) and [LibreSDR qualification](hardware/libresdr/qualification.md) document the pieces used for the live test. Firmware, factory backups, station identifiers and RF recordings stay in private storage.
 
 **Upstream references:** <https://github.com/RadioFoundry/RadioFoundry>, <https://github.com/M17-Project/gr-m17>, <https://github.com/drowe67/radae>.

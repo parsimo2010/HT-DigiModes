@@ -1,5 +1,7 @@
 # Digital Radio Laboratory — Step-by-Step Development Plan
 
+**Original planning snapshot.** Use the [current development plan](docs/DEVELOPMENT_PLAN.md) and [native Linux session handoff](notes/next-session.md) for active work.
+
 **Project:** M17 on-device firmware + host-assisted RADE BBFM  
 **Prepared:** 2026-11-24  
 **Audience:** Radio owner and Codex engineering agent  

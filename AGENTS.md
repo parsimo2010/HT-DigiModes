@@ -15,7 +15,7 @@ Read `docs/DEVELOPMENT_PLAN.md` before making changes. Work in small, reviewable
 
 ## Priorities
 
-Begin with the software-only, P0 tasks listed in `docs/DEVELOPMENT_PLAN.md`: inventory templates, backup checklist, UHD environment-detection script (read only), GNU Radio reference test instructions and RADE offline BER harness. Keep a Git commit for each independently testable step. The user should be able to run safe commands locally and paste outputs back. Do not make up a new firmware driver before receiving model/cable/backup evidence.
+The DM-1701 is in live-air development. Start each session from [the current handoff](notes/next-session.md). Use native Linux and direct USB for the next session. Work toward one observable end-to-end result at a time. The operator prefers short indoor, low-power radiated tests with separate stub antennas for functional measurements. Reuse the qualified setup and existing evidence. When a test fails, save the capture and diagnose the first missing signal, sync or payload. Keep commits small enough to review even when the milestone spans both devices.
 
 ## Acceptance for every change
 

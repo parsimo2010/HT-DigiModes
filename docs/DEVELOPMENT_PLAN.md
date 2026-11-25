@@ -3,9 +3,10 @@
 **Project:** M17 on-device firmware + host-assisted RADE BBFM  
 **Prepared:** 2026-11-24  
 **Audience:** Radio owner and Codex engineering agent  
-**Status:** Plan; no hardware tests or flashing performed by this document  
+**Status:** Live-air M17 data testing on the DM-1701. Next session on native Linux.
+
 **Recommended first development target:** Baofeng DM-1701  
-**Second target:** incoming *Baofeng DM-1801*, hardware revision **not yet verified**
+**Second target:** operator-confirmed DM-1801 Pro, board revision and cable still unverified.
 
 > **Project rule:** No firmware flash or experimental RF transmission is authorized by this plan alone. Establish backups, recovery, safety interlocks, and model-specific compatibility before each operation. Hardware measurements require a human at the bench.
 
@@ -19,6 +20,14 @@ The project has two related but distinct end goals:
 The LibreSDR is the **reference RF source, receiver and measurement instrument**, not a prerequisite second developer radio. The existing **DR-1801UV** is a separate Auctus A6-based stock reference; it is **not** the incoming DM-1801 and must never receive a DM-1801 firmware image.
 
 **Known purchases / inventory (verify on receipt):** one DM-1701 and one labeled DM-1801 arriving from Radioddity; one LibreSDR already present; one DR-1801UV already present. Earlier plans for two C62 and two DM-32UV radios were canceled. No DB25-D is required for this plan.
+
+### Current milestone order
+
+1. **Carry the established transmitter to native Linux.** The DM-1701 already sends a complete data burst using the HR_C6000. GNU Radio decoded six of six frames at 425.525 MHz with a −750 Hz receiver correction. Use the private reference capture as a quick installation check on the new host. [Bench evidence](../notes/dm1701-m17-first-rf.md) and [Linux handoff](../notes/next-session.md).
+2. **Demonstrate the reverse link.** Implement handheld M17 reception, use the LibreSDR as a bounded reference transmitter, and compare the handheld's decoded bytes with the six transmitted payloads. Record sent, received and correct frame counts.
+3. **Demonstrate standalone voice.** Integrate Codec2, microphone, speaker and the needed PTT/UI behavior. Demonstrate intelligible speech in each direction against the SDR.
+
+The operator prefers short indoor, low-power on-air trials with separate stub antennas. Use a working configuration to attempt each milestone end to end. Keep the capture when a run fails and investigate the first stage that failed. Use a conducted fixture for calibrated input-level or sensitivity measurements. The detailed bring-up sections below remain references for those investigations.
 
 ### Success definitions
 
@@ -63,7 +72,7 @@ Do not develop a new DMR stack, emulate trunking, modify both radios simultaneou
 
 ## 2. Safety and recovery gates by operation
 
-1. **RF containment.** Use a 50-ohm dummy load rated above the selected radio's maximum RF power, a directional coupler or independently confirmed attenuation, and appropriate isolation. **Do not connect a 5 W handheld TX or any mobile TX directly to a LibreSDR RX port.** Calculate the worst-case input at the SDR in dBm and compare with the exact board's input rating before connection. Include connector/cable/coupler loss and a safety margin. Use minimum radio power; begin with receive-only SDR operation. Confirm TX channel permissions, amateur-service identification and emission limits before any radiated custom waveform.
+1. **Conducted RF measurements.** Use a 50-ohm dummy load rated above the selected radio's maximum RF power, a directional coupler or independently confirmed attenuation, and appropriate isolation. **Do not connect a 5 W handheld TX or any mobile TX directly to a LibreSDR RX port.** Calculate the worst-case input at the SDR in dBm and compare with the exact board's input rating before connection. Include connector/cable/coupler loss and a safety margin. Use minimum radio power; begin with receive-only SDR operation. Confirm TX channel permissions, amateur-service identification and emission limits before any radiated custom waveform.
 2. **Interlock TX.** Any custom-firmware PTT command requires a bounded TX duration, fail-closed timeout, host-disconnect unkey, buffer-underrun unkey, and hardware/radio TOT. Default custom TX to *disabled* until an operator explicitly arms it.
 3. **Preserve factory state.** Record model, FCC/board ID, bootloader/update procedure, firmware version, codeplug and any accessible entire flash/calibration/codec backup. Keep private backups offline/out of Git. A codeplug export is *not* a factory firmware or calibration backup.
 4. **Recovery rehearsed.** Before first reflash, obtain the correct stock firmware or verified recovery backup and confirm how to enter the loader. Never use an image intended for another model, even if connectors/display look similar. Never erase the bootloader or calibration areas.
@@ -193,15 +202,13 @@ These are **local research checkouts**, not vendor-source material to blindly co
 
 **Pass:** golden vectors round-trip without radio hardware, with documented frame timing and known test payloads.
 
-### M17.2 — Compare two TX physical paths on DM-1701
+### M17.2 — Native transmit path demonstrated
 
-**Path A: HR_C6000 native physical-layer TX.** RadioFoundry demonstrated arbitrary **288-bit / 30 ms** transmit blocks in PHY mode, equivalent to DMR's **4800 symbols/s** when packed as 4FSK dibits. This is *not* a claim of arbitrary baud, filters or deviation. Send known alternating levels, PRBS and sync-like sequences; capture with SDR; compare symbol mapping, spectral shape, deviation and continuity. Determine whether it can conform to M17's four deviation levels and RRC 0.5 shaping, **not just whether the bits are visible**.
-
-**Path B: MOD1 register modulation.** RadioFoundry measured changing MOD1 offset at about 32.5–37.5k updates/s and a modest (~6-bit) modulation resolution; this can generate custom FM but is timing/noise limited. Implement a timer-paced finite waveform with jitter statistics and a strict PTT watchdog; do **not** start with continuous speech. Capture and compare symbol EVM/BER, deviation and occupied spectrum to Path A.
-
-**Decision:** choose a TX PHY only if independently decoded bits/frames and measured spectral properties are acceptable. If neither works, evaluate the documented <https://github.com/M17-Project/DM-1701_mod> PCB route **as a separate opt-in hardware branch**, not as an unrecorded change.
+The HR_C6000 sent twelve 144-symbol chunks in one burst. The independent receiver measured 4,800 symbols/s, approximately ±2.40 kHz outer deviation and 9.67 kHz occupied bandwidth on the successful capture. This establishes the native path for current development. Revisit MOD1 timer-paced modulation only if a specific shaping or interoperability failure warrants the comparison.
 
 ### M17.3 — Prove receive path and frame decoding
+
+First target a single complete on-air decode. Use the diagnostics below when needed, then characterize repeatability and offset tolerance.
 
 - Probe HR_C6000's ungated RX RAM / 8 kHz FM audio and any raw PHY receive/test mode. Record full effective audio response, particularly >3 kHz, and sample timestamps/gaps.
 - Generate known M17 bursts on LibreSDR, with clock and carrier offsets swept independently. Feed the DM-1701 in a safe RF arrangement.
@@ -355,7 +362,7 @@ For each RF session record:
 - UTC timestamp; test ID; transmitting and receiving devices and serial-number **aliases**, not private serials.
 - Model, hardware version, firmware build git SHA and modulation approach (native PHY, MOD1, codec mixer, SDR reference).
 - Frequencies, channel width, RF power setting, deviation, encoder/frame parameters, sample rate and gain.
-- Dummy load rating, coupler losses, attenuator values and calculated worst-case SDR input power (dBm).
+- For radiated tests record antennas, approximate separation, power setting and duration. For conducted tests record the load rating, coupling, attenuation and calculated SDR input power.
 - SDR make/model, UHD version, FPGA image SHA, center frequency, sample rate, gain, reference clock, TX/RX antenna port.
 - Captured IQ/audio/test vectors with file sizes and SHA-256 hashes; git-ignored paths or external storage reference.
 - BER/FER/sync rate, packet-drop and underrun counters, carrier offset, occupied bandwidth, timing jitter.
@@ -365,27 +372,14 @@ For M17 and RADE compare transmissions at the **same bench geometry and equipmen
 
 ---
 
-## 12. First Codex session — exact task request
+## 12. Next session
 
-Codex should begin in the **new local lab repository**, *not* in the RadioFoundry tree. Paste this as its first task:
-
-> Read `AGENTS.md` and `docs/DEVELOPMENT_PLAN.md`. Perform **software-only LAB-001 through LAB-005 scaffolding**, without touching radios. First inspect the repository and propose a minimal incremental task list. Create the documented folder structure, experiment metadata validation, a safe command-line `lab status` report that only reads local host/tool information, and host-only unit tests. Include examples for invoking `uhd_find_devices` and `uhd_usrp_probe` **without executing RF TX or flashing**. Add a reproducibility manifest for pinned upstream toolchains and a README quick-start. Do not claim hardware verification, do not invent observed device details, and do not download or commit proprietary firmware/codec images. Keep each change in a small commit and report the exact commands/tests run. Before any future hardware-facing operation, output the proposed command, affected device, safety check, and a request for human approval.
-
-**Initial human input after Codex scaffolding:** DM-1701 and DM-1801 photos/model IDs, factory versions, cable test results, real backup status, UHD probe results and available RF protection hardware. Codex can then update the gates and choose the correct next issue.
+Resume on the native Linux computer from the [operator handoff](../notes/next-session.md). The software reference, installed test image, factory calibration backup and first radiated TX measurements already exist.
 
 ## 13. Key technical decisions still open
 
-- Does the delivered **DM-1801** use current HR_C7000 hardware or older NXP hardware? This gates its entire firmware and connector plan.
-- Does DM-1701 M17 TX work without PCB modification: native HR_C6000 PHY vs MOD1 software waveform? Measure both.
+- Which board revision and cable does the operator-confirmed DM-1801 Pro use? Verify those before selecting firmware for that track.
 - Can either radio receive acceptable 4800-symbol/s M17 with its accessible samples or native PHY? It must be demonstrated.
 - Can RADE BBFM tolerate 9.6→8 kHz resampling and 8-bit quantization, the radio audio response and the tested UART headroom? Offline and RF BER must answer this.
 - Is a true USB-to-UART connection available on the selected radio, or should the bridge use DM-1701 native USB? The connector alone does not decide.
 - What licensing structure allows reuse of open DSP algorithms without making an incompatible contribution upstream?
-
----
-
-## 14. One-page arrival recap
-
-**Do tomorrow:** verify exact labels and cables; charge and stock-test; make original codeplug plus supported full backups; confirm recovery; check LibreSDR with UHD; run **software-only** M17 and RADE reference tests. **Do not do tomorrow:** flash both radios, key arbitrary waveforms into unknown loads, wire unknown programming pins to a converter, modify a DM-1701 PCB or assume the DM-1801 is a Pro.
-
-**First milestone worth celebrating:** known-good reference M17 and RADE signals on the computer, complete factory backups, confirmed DM-1801 revision, and a repeatable LibreSDR capture. That is a solid starting point for Codex-driven modem development.
