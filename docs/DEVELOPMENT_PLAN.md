@@ -61,13 +61,13 @@ Do not develop a new DMR stack, emulate trunking, modify both radios simultaneou
 
 ---
 
-## 2. Safety and recovery gates — must pass before modifying hardware or RF
+## 2. Safety and recovery gates by operation
 
 1. **RF containment.** Use a 50-ohm dummy load rated above the selected radio's maximum RF power, a directional coupler or independently confirmed attenuation, and appropriate isolation. **Do not connect a 5 W handheld TX or any mobile TX directly to a LibreSDR RX port.** Calculate the worst-case input at the SDR in dBm and compare with the exact board's input rating before connection. Include connector/cable/coupler loss and a safety margin. Use minimum radio power; begin with receive-only SDR operation. Confirm TX channel permissions, amateur-service identification and emission limits before any radiated custom waveform.
 2. **Interlock TX.** Any custom-firmware PTT command requires a bounded TX duration, fail-closed timeout, host-disconnect unkey, buffer-underrun unkey, and hardware/radio TOT. Default custom TX to *disabled* until an operator explicitly arms it.
 3. **Preserve factory state.** Record model, FCC/board ID, bootloader/update procedure, firmware version, codeplug and any accessible entire flash/calibration/codec backup. Keep private backups offline/out of Git. A codeplug export is *not* a factory firmware or calibration backup.
 4. **Recovery rehearsed.** Before first reflash, obtain the correct stock firmware or verified recovery backup and confirm how to enter the loader. Never use an image intended for another model, even if connectors/display look similar. Never erase the bootloader or calibration areas.
-5. **Human decision gate.** Codex may build, simulate, inspect and document, but may **not issue a command that flashes, keys TX, changes persistent calibration, or drives a PA** without the user confirming the exact radio, current state, load, cabling and command.
+5. **Operator authorization.** For an application install, verify the named radio, bootloader layout, image checksum, write plan and stock recovery route. An explicit request to install that previewed image authorizes the corresponding write. For a conducted transmission apply the fixture requirements in item 1. The operator may also select a radiated measurement with separate antennas and local PTT. Record that choice and check the intended frequency, station identification, power and receiver setup for the transmission.
 
 **Go/no-go record:** create `notes/gates.md` and log each pass with date, model/serial (private), evidence file names, measurement reference and approving human. Failed gates block the next RF/flash action; software-only work can proceed.
 
@@ -344,7 +344,7 @@ Use GitHub issues or Codex tasks after the repo exists. These are **outcomes and
 | `RADE-004` | P2 | Two-direction BBFM BER bench | SDR/radio alternating directions, data and plots |
 | `RADE-005` | P3 | Neural/real-time integration | model hash, voice recordings, latency & safety stats |
 
-**Milestone gate order:** complete all P0 tickets before replacement firmware or developer RF; prioritize `M17-002` and `RADE-002` next so the project's hardest hardware unknowns are answered early. Do not implement the complete codec/UI before PHY feasibility.
+**Milestone order.** Apply each gate to the operation it covers. An authorized DM-1701 install can precede RF fixture qualification and stock RF captures. Record any deferred baseline. Save factory calibration before changing settings or testing RF. Track RADE independently.
 
 ---
 
