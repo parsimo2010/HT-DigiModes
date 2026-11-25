@@ -1,0 +1,16 @@
+{
+  "graph": "examples/m17_loopback_noisychannel.grc",
+  "graph_sha256": "6f33d05d42894b981b476061b8d84f605ce41c971ac375f96c6e0b2f4a830140",
+  "sample_rate_hz": 48000,
+  "symbol_rate_hz": 4800,
+  "rrc_alpha": 0.5,
+  "rrc_taps": 81,
+  "fm_hz_per_symbol_level": 800,
+  "noise_voltage": 0.01,
+  "noise_seed": 0,
+  "frequency_offset": 0,
+  "epsilon": 1.0,
+  "channel_taps": [1],
+  "capture_port": "channels_channel_model_0:0",
+  "payload_hex": "000102030405060708090a0b0c0d0e0f"
+}
