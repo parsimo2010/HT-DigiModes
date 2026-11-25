@@ -25,6 +25,12 @@
 - On 2026-11-24 local time, after the operator put the DM-1701 in DFU and approved the read, verified the factory bootloader descriptor and used dfu-util 0.11 to upload 2 KiB from the advertised application base. The tool reported success, but it returned two identical 1 KiB blocks with a reset vector into the bootloader region. The result matched neither archived V02.06 candidate's application start.
 - The probe bytes and SHA-256 report are private. This is evidence of a failed **application** read, not an installed firmware dump. USB sharing was removed. No flash write, erase, unlock, or calibration command was sent.
 
+## Approved DM-1701 stock firmware update
+
+- The local CPS-only ZIP contained no image. The complete Radioddity V02.03 archive supplied CSV and noCSV images. The operator explicitly approved the CSV image and confirmed factory update mode, charged battery, USB cable and antenna.
+- `radio_tool` 0.5.1 identified the image as DM-1701. Its preview listed nine MCU application sectors starting at `0x0800C000` and skipped the external SPI resource segment. After checking that plan and the device's bootloader memory descriptor, reran `radio_tool flash --input 'DM-1701(CSV)-V02.03 Only for Radioddity.bin' --write`.
+- The writer reported nine erases, 869 KiB written, and exit 0. No bootloader or external SPI write was requested. USB sharing was removed and the private codeplug backup hash still matched. This is an updater result, not a firmware readback or proof of normal boot. Operator verification of boot, menu version, channel retention, and operation is pending.
+
 ## Remaining arrival checklist
 
 - DM-1701 exact marking/FCC ID (private attachment):

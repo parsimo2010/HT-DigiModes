@@ -4,7 +4,7 @@ A research lab to develop standalone M17 on a Baofeng DM-1701 and host-assisted 
 
 **Start here:** [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md) and [`AGENTS.md`](AGENTS.md).
 
-**Status:** The operator confirmed basic analog FM and DMR transmit and receive on both handhelds. The DM-1701 stock codeplug was backed up and verified privately. Installed firmware and factory calibration are not backed up. No firmware change or instrumented RF measurement has been performed. See the [arrival log](notes/arrival-session.md).
+**Status:** The operator confirmed basic analog FM and DMR transmit and receive on both handhelds before any firmware change. The DM-1701 stock codeplug was backed up privately. The updater completed an approved write of Radioddity V02.03 CSV to the DM-1701. First boot and operation on V02.03 are pending operator verification. See the [arrival log](notes/arrival-session.md).
 
 ## Host-only quick start
 
