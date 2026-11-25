@@ -9,7 +9,7 @@ from gnuradio import analog, blocks, digital, filter, gr, m17
 from gnuradio.filter import firdes
 
 
-def receive(source, rate, seconds, capture=None):
+def receive(source, rate, seconds, capture=None, carrier_offset_hz=0.0):
     graph = gr.top_block("M17 receive test")
     limit = blocks.head(gr.sizeof_gr_complex, int(rate * seconds))
     graph.connect(source, limit)
@@ -23,7 +23,14 @@ def receive(source, rate, seconds, capture=None):
     )
     decoder = m17.m17_decoder(True, False, 2.0, 30.0, False, False, 0, "", "", "", 0)
     sink = blocks.vector_sink_b()
-    graph.connect(limit, channel, fm, matched, timing, decoder, sink)
+    # Keep the recording at the original tune. Mix a measured carrier offset
+    # to zero before filtering so replay uses the same correction as live RX.
+    if carrier_offset_hz:
+        correction = blocks.rotator_cc(-2 * math.pi * carrier_offset_hz / rate)
+        graph.connect(limit, correction, channel)
+    else:
+        graph.connect(limit, channel)
+    graph.connect(channel, fm, matched, timing, decoder, sink)
     if capture is not None:
         # The sink owns the descriptor. Preserve prior captures and keep new ones private.
         fd = os.open(capture, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
@@ -40,11 +47,15 @@ def main():
     parser.add_argument("--rate", type=int, choices=(48000, 960000), default=48000)
     parser.add_argument("--seconds", type=int, choices=range(1, 31), default=5, metavar="1..30")
     parser.add_argument("--frequency-hz", type=int)
+    parser.add_argument("--carrier-offset-hz", type=float, default=0.0,
+                        help="received carrier minus tuned center, in Hz (negative for a low carrier)")
     parser.add_argument("--antenna", help="verified channel 0 receive port")
     parser.add_argument("--check-ramp", action="store_true", help="expect the lab fixture's 00..0f payload")
     parser.add_argument("--expect-frames", type=int, help="require this exact number of complete payloads")
     parser.add_argument("--capture-iq", type=Path, help="save the limited input to a new private complex float32 file")
     args = parser.parse_args()
+    if not math.isfinite(args.carrier_offset_hz) or abs(args.carrier_offset_hz) >= args.rate / 2:
+        parser.error("--carrier-offset-hz must be finite and inside the sampled band")
     if args.expect_frames is not None and args.expect_frames <= 0:
         parser.error("--expect-frames must be positive")
     if args.iq is not None:
@@ -64,7 +75,7 @@ def main():
         source.set_antenna(args.antenna, 0)
         source.set_center_freq(args.frequency_hz, 0)
 
-    payload = receive(source, args.rate, args.seconds, args.capture_iq)
+    payload = receive(source, args.rate, args.seconds, args.capture_iq, args.carrier_offset_hz)
     if not payload or len(payload) % 16:
         raise SystemExit("No complete M17 stream or partial payload output")
     frames = len(payload) // 16
