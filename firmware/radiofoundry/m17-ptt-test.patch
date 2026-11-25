@@ -1,0 +1,660 @@
+From 4c6a56e5bbbf0f1c71be94b8f8790fa9b956298c Mon Sep 17 00:00:00 2001
+From: HT DigiModes Lab <lab@localhost>
+Date: Wed, 25 Nov 2026 08:29:19 -0700
+Subject: [PATCH] Send one locally armed M17 data test burst through the air
+ provider
+
+---
+ config/features.mk          |   5 +-
+ core/config.h               |   3 +
+ core/input/input_forward.c  |   4 +
+ core/m17/m17_test_vector.h  |  51 ++++++++++++
+ core/radio/radio.h          |   5 ++
+ core/radio/radio_sm.c       | 151 ++++++++++++++++++++++++++++++++++--
+ core/radio/radio_sm.h       |   8 +-
+ core/radio/radio_task.c     |   3 +
+ docs/spec/radio-features.md |   4 +
+ docs/user/08-fm.md          |   4 +
+ tests/hil/features.toml     |   5 ++
+ tests/host/Makefile         |   9 ++-
+ tests/host/radioCoreTest.c  | 115 ++++++++++++++++++++++++++-
+ 13 files changed, 356 insertions(+), 11 deletions(-)
+ create mode 100644 core/m17/m17_test_vector.h
+
+diff --git a/config/features.mk b/config/features.mk
+index 1f99e6a4..1be1d631 100644
+--- a/config/features.mk
++++ b/config/features.mk
+@@ -338,6 +338,7 @@ CONFIG_MBE := $(CONFIG_IMBE)
+ CONFIG_AIR_RAW ?= n
+ # Read-only M17 frame generator in the debug view.
+ CONFIG_M17_FRAME_TEST ?= n
++CONFIG_M17_PTT_TEST ?= n
+ # P25 trunked: the codec of its systems and channels (docs/spec/p25-codeplug.md 3), a control channel decoded and voice
+ # channel grants followed, and where the system allows it registration, voice requests and transmit on the grant
+ # (core/p25/p25_follow.c, docs/spec/p25-trunking.md). Needs P25
+@@ -353,7 +354,7 @@ CONFIG_SATELLITE_TLE ?= $(if $(filter y,$(CONFIG_DEBUGLINK)),y,n)
+ 
+ FEATURES := USB_SERIAL_REQUEST FM SUBTONE DMR DMR_PRIVACY DMR_AES DMR_TALKER_ALIAS DMR_GPS DMR_SMS DMR_TMS DMR_ARS DMR_LRRP DMR_SIGNALING DMR_EMERGENCY DMR_ROAMING DMR_TRUNK DMR_TRUNK_TX DMR_TRUNK_SUPL DMR_TRUNK_GW VOICE_CAPTURE DMR_IP_GATEWAY ZONE_SHARE DMR_UDP_COMPRESS NET_TCP NET_KISS NET_HTTP NET_HTTP_GZIP NET_WEBCTL NET_RADIO_UDP NET_RIGCTL NET_APRSIS NET_USRP MDNS TFTP TFTP_IDDB IDDB_COMPACT DMR_CONTROL_STATION SNMP SFR SFR_DUALPATH_RX SFR_CWID TASK_STACKS \
+ 	USB HOSTLINK USB_NETWORK NET_PPP HOTSPOT HOTSPOT_SPLIT DEBUGLINK CPS_OPENFW CPS_FAST VFO VFO_FM VFO_DMR DIAG BACKLIGHT_TEST FONT_XL FONT_AA FONT_BIG LANG_ES LANG_IT LANG_FR LANG_ZH CJK_GLYPHS LANG_DEFAULT_ES LANG_DEFAULT_IT LANG_DEFAULT_FR LANG_DEFAULT_ZH UI_COLOR UI_SETTINGS SCAN DUAL_WATCH BEEP SIG_TONES FM_TX_TONES DTMF \
+-	RX_EXT VOX REF_TRIM BATTERY_SAVE VIBRATE GPS AUDIO_PROBE STUB_ENTRY NAND_STORAGE CRASH_LOG CRASH_SCREEN CRASH_REPORT WATCHDOG SUPPORT_INFO FAULT_TRACE AM_RX BCAST_FM APRS APRS_AFSK APRS_DMR APRS_RX APRS_IGATE GPS_SKY SATELLITE_TLE KEY_ASSIGN CHANNEL_LIST CHANNEL_EDIT ZONE_EDIT CONTACT_EDIT VOLUME_BAR P25 P25_TRUNK NXDN NXDN_SCRAMBLER AIR_RAW M17_FRAME_TEST
++	RX_EXT VOX REF_TRIM BATTERY_SAVE VIBRATE GPS AUDIO_PROBE STUB_ENTRY NAND_STORAGE CRASH_LOG CRASH_SCREEN CRASH_REPORT WATCHDOG SUPPORT_INFO FAULT_TRACE AM_RX BCAST_FM APRS APRS_AFSK APRS_DMR APRS_RX APRS_IGATE GPS_SKY SATELLITE_TLE KEY_ASSIGN CHANNEL_LIST CHANNEL_EDIT ZONE_EDIT CONTACT_EDIT VOLUME_BAR P25 P25_TRUNK NXDN NXDN_SCRAMBLER AIR_RAW M17_FRAME_TEST M17_PTT_TEST
+ 
+ # The panel's width in pixels: the display class the board's board.toml names (hardware.gallery = "160x128", the width
+ # first). Empty when it names none, which counts as a narrow panel
+@@ -423,6 +424,8 @@ $(if $(and $(call feature_on,P25_TRUNK),$(if $(call feature_on,P25),,x)),$(error
+ $(if $(and $(call feature_on,P25),$(if $(call feature_on,DMR),,x)),$(error CONFIG_P25=y needs CONFIG_DMR=y (its talk groups are the codeplug's contacts)))
+ $(if $(and $(call feature_on,NXDN),$(if $(call feature_on,DMR),,x)),$(error CONFIG_NXDN=y needs CONFIG_DMR=y (its voice is the DMR vocoder's)))
+ $(if $(and $(call feature_on,AIR_RAW),$(if $(call feature_on,DEBUGLINK),,x)),$(error CONFIG_AIR_RAW=y needs CONFIG_DEBUGLINK=y))
++$(if $(and $(call feature_on,M17_PTT_TEST),$(if $(and $(call feature_on,AIR),$(call feature_on,VFO_FM),$(call feature_on,DMR)),,x)),$(error M17_PTT_TEST needs the air provider, DMR and FM VFO))
++$(if $(and $(call feature_on,M17_PTT_TEST),$(call feature_on,AIR_RAW)),$(error M17_PTT_TEST requires AIR_RAW disabled))
+ $(if $(and $(call feature_on,M17_FRAME_TEST),$(if $(call feature_on,DEBUGLINK),,x)),$(error CONFIG_M17_FRAME_TEST=y needs CONFIG_DEBUGLINK=y))
+ ifneq ($(call feature_on,DEBUGLINK),)
+   ifeq ($(call feature_on,HOSTLINK),)
+diff --git a/core/config.h b/core/config.h
+index d79ec52e..8cd1060b 100644
+--- a/core/config.h
++++ b/core/config.h
+@@ -354,6 +354,9 @@
+ #ifndef CONFIG_P25_TRUNK
+ #define CONFIG_P25_TRUNK		0
+ #endif
++#ifndef CONFIG_M17_PTT_TEST
++#define CONFIG_M17_PTT_TEST 0
++#endif
+ #ifndef CONFIG_M17_FRAME_TEST
+ #define CONFIG_M17_FRAME_TEST 0
+ #endif
+diff --git a/core/input/input_forward.c b/core/input/input_forward.c
+index 41990e21..7f990813 100644
+--- a/core/input/input_forward.c
++++ b/core/input/input_forward.c
+@@ -7,7 +7,11 @@
+ void input_forward(const input_event_t *ev, bool ptt_blocked)
+ {
+ 	if (ev->action == ACT_PTT && (ev->gesture == GESTURE_UP || (ev->gesture == GESTURE_DOWN && !ptt_blocked))) {
++#if CONFIG_M17_PTT_TEST
++		radio_req_ptt_local_test(ev->gesture == GESTURE_DOWN);
++#else
+ 		radio_req_ptt(ev->gesture == GESTURE_DOWN);
++#endif
+ #if CONFIG_FM_TX_TONES
+ 	} else if (ev->action == ACT_TONE_BURST &&
+ 			(ev->gesture == GESTURE_UP || (ev->gesture == GESTURE_DOWN && !ptt_blocked))) {
+diff --git a/core/m17/m17_test_vector.h b/core/m17/m17_test_vector.h
+new file mode 100644
+index 00000000..326071b4
+--- /dev/null
++++ b/core/m17/m17_test_vector.h
+@@ -0,0 +1,51 @@
++// SPDX-License-Identifier: MIT
++// Copyright (c) 2026 The RadioFoundry Authors
++// AB1CDE to AB2CDE, data stream TYPE 3, payload 00..0f, six LICH fragments.
++// MSB-first dibits in transmit order, shared across frame and modem chunk boundaries.
++static const uint8_t m17_test_burst[] = {
++	// Preamble
++	0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77,
++	0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77,
++	0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77,
++	0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77,
++	// Link setup
++	0x55, 0xf7, 0xd7, 0x35, 0x62, 0xd0, 0xca, 0xf6, 0x8d, 0x5a, 0xfb, 0x0e,
++	0x86, 0x80, 0xca, 0xba, 0xcd, 0x67, 0x0e, 0xc0, 0x16, 0x53, 0xd1, 0x0b,
++	0xe8, 0x76, 0x64, 0x23, 0x33, 0xdc, 0x14, 0x6a, 0xda, 0xf2, 0x0d, 0x0d,
++	0xd2, 0x86, 0xf5, 0x33, 0x87, 0x13, 0xf3, 0x18, 0xa9, 0x2d, 0x59, 0xc3,
++	// Stream 0
++	0xff, 0x5d, 0xd1, 0xa8, 0xd2, 0xb8, 0xa4, 0xce, 0xe4, 0x50, 0x3f, 0x0d,
++	0xd4, 0x1f, 0x13, 0xfb, 0x56, 0xfc, 0x09, 0x5c, 0x96, 0xb2, 0x21, 0x5c,
++	0xf9, 0x6f, 0x59, 0x0f, 0x5c, 0xbb, 0x5b, 0xea, 0x94, 0x77, 0x61, 0xe9,
++	0xbf, 0x5e, 0x83, 0x71, 0xf7, 0x01, 0x49, 0x96, 0xf3, 0x7a, 0x26, 0xc4,
++	// Stream 1
++	0xff, 0x5d, 0x70, 0xe9, 0xf2, 0x98, 0xa5, 0xee, 0xcc, 0x78, 0x7f, 0x2d,
++	0x94, 0x17, 0x4b, 0xbb, 0x5e, 0xfc, 0x01, 0x5c, 0x96, 0xa2, 0x31, 0x54,
++	0xeb, 0x6f, 0x4f, 0x0d, 0x5c, 0xb9, 0x49, 0xea, 0x94, 0x75, 0x65, 0xe9,
++	0xbf, 0x5b, 0x83, 0x75, 0xf7, 0x01, 0x49, 0x16, 0x72, 0x7a, 0xa7, 0xc5,
++	// Stream 2
++	0xff, 0x5d, 0xd1, 0xe9, 0xf3, 0x98, 0x85, 0xee, 0xa4, 0x70, 0x3f, 0x4d,
++	0x94, 0x1f, 0x53, 0xab, 0x56, 0xbc, 0x49, 0x1c, 0x96, 0xa2, 0x31, 0x54,
++	0xf1, 0x7f, 0x4d, 0x1d, 0x4c, 0xa9, 0x4d, 0xec, 0x10, 0x75, 0x67, 0xed,
++	0xbb, 0x5f, 0x83, 0x75, 0x73, 0x04, 0x48, 0xb6, 0x53, 0x7a, 0xa7, 0xc5,
++	// Stream 3
++	0xff, 0x5d, 0xd0, 0xa9, 0xf2, 0xb8, 0x84, 0xee, 0xcc, 0x78, 0x3f, 0x4d,
++	0x94, 0x17, 0x43, 0xab, 0x5e, 0xfc, 0x09, 0x5c, 0x96, 0xa2, 0x31, 0x5c,
++	0xf9, 0x6d, 0x4b, 0x0f, 0x5c, 0xbb, 0x59, 0xea, 0x10, 0x77, 0x61, 0xed,
++	0xbf, 0xda, 0x83, 0x71, 0xf7, 0x01, 0x48, 0x36, 0x53, 0x7b, 0x26, 0xc5,
++	// Stream 4
++	0xff, 0x5d, 0xd0, 0xa9, 0xb2, 0xb8, 0x84, 0xee, 0xc4, 0x70, 0x3f, 0x4d,
++	0x94, 0x1f, 0x5b, 0xa3, 0x5e, 0xfc, 0x09, 0x5c, 0x94, 0xa2, 0x31, 0x5c,
++	0xfb, 0x6d, 0x4d, 0x0f, 0x5c, 0xbb, 0x5d, 0xea, 0x14, 0xf7, 0x61, 0xed,
++	0xbf, 0x5a, 0x83, 0x71, 0xf7, 0x01, 0x48, 0x16, 0x73, 0x7b, 0x26, 0xc5,
++	// Stream 5
++	0xff, 0x5d, 0xf0, 0xe9, 0xb2, 0xb8, 0xe4, 0x8e, 0x8c, 0x78, 0x3f, 0x4d,
++	0xd4, 0x57, 0x4b, 0xa3, 0x56, 0xf4, 0x11, 0x4c, 0x94, 0xb2, 0x21, 0x5e,
++	0xeb, 0x6d, 0x4b, 0x0d, 0x5c, 0xbf, 0x5d, 0xea, 0x14, 0xf3, 0x65, 0x69,
++	0x3f, 0x5b, 0x83, 0x71, 0xf7, 0x00, 0xc9, 0x16, 0x72, 0x7b, 0x27, 0xc5,
++	// End marker
++	0x55, 0x5d, 0x55, 0x5d, 0x55, 0x5d, 0x55, 0x5d, 0x55, 0x5d, 0x55, 0x5d,
++	0x55, 0x5d, 0x55, 0x5d, 0x55, 0x5d, 0x55, 0x5d, 0x55, 0x5d, 0x55, 0x5d,
++	0x55, 0x5d, 0x55, 0x5d, 0x55, 0x5d, 0x55, 0x5d, 0x55, 0x5d, 0x55, 0x5d,
++	0x55, 0x5d, 0x55, 0x5d, 0x55, 0x5d, 0x55, 0x5d, 0x55, 0x5d, 0x55, 0x5d,
++};
+diff --git a/core/radio/radio.h b/core/radio/radio.h
+index 192a65b0..119d2d99 100644
+--- a/core/radio/radio.h
++++ b/core/radio/radio.h
+@@ -606,6 +606,11 @@ radio_vfo_copy_t radio_req_vfo_copy_checked(void);
+ // 8.33 kHz air band grid (radio/radio_am.h); 0 = auto, the width's: 12.5 kHz, 25 kHz wide or in the air band
+ void radio_req_vfo_step_size(uint32_t hz);
+ void radio_req_ptt(bool down);
++#if CONFIG_M17_PTT_TEST
++// Input engine only. The bench verifies both physical contacts again in the radio task.
++#define RADIO_PTT_LOCAL_TEST 3
++void radio_req_ptt_local_test(bool down);
++#endif
+ // PTT for a host audio session (USRP, docs/spec/usb-audio.md): the host's samples go on air instead of the microphone
+ // (FM: through the board's audio tap, refused without one; DMR: into the encoder, core/usbaudio/audio_mux.c). Up is
+ // radio_req_ptt(false)
+diff --git a/core/radio/radio_sm.c b/core/radio/radio_sm.c
+index 84592e4f..ff15a813 100644
+--- a/core/radio/radio_sm.c
++++ b/core/radio/radio_sm.c
+@@ -11,6 +11,10 @@
+ #include "settings/settings.h"
+ #include "config.h"
+ #include "hal_dtmf.h"
++#if CONFIG_M17_PTT_TEST
++#include "input/input.h"
++#include "m17/m17_test_vector.h"
++#endif
+ #include "codeplug/codeplug_modes.h"	// channel kinds (docs/spec/channel-modes.md): parked channels, in every build
+ #include "codeplug/codeplug_tag.h"	// CODEPLUG_SYSTEM_NONE
+ #if CONFIG_ZONE_WRITE
+@@ -132,7 +136,7 @@ static inline bool air_mode(uint8_t mode)
+ }
+ // What a scan stop hears of an air mode's call (air_heard)
+ enum { AIR_HEARD_NONE, AIR_HEARD_PENDING, AIR_HEARD_PLAYED, AIR_HEARD_OTHER };
+-#if CONFIG_AIR_RAW
++#if CONFIG_AIR_RAW || CONFIG_M17_PTT_TEST
+ #define BENCH_HELD(sm)		((sm)->air_bench)	// the debug link's air interface bench has the modem
+ #else
+ #define BENCH_HELD(sm)		false
+@@ -1459,6 +1463,12 @@ static bool tx_held(const radio_sm_t *sm)
+ 
+ static bool key_tx(const radio_sm_t *sm, uint32_t hz, radio_bw_t bw, uint8_t power, const subtone_t *tone)
+ {
++#if CONFIG_M17_PTT_TEST
++	// The bench image reserves the core's transmitter for the local vector session.
++	if (!sm->m17_open) {
++		return false;
++	}
++#endif
+ 	if (tx_held(sm)) {
+ 		return false;
+ 	}
+@@ -6912,7 +6922,7 @@ static void ptt_down(radio_sm_t *sm, uint32_t now_ms)
+ 		deny(sm, TXDENY_HOTSPOT);	// the host link transmits for the hotspot; PTT does nothing until it ends
+ 		return;
+ 	}
+-#if CONFIG_AIR_RAW
++#if CONFIG_AIR_RAW || CONFIG_M17_PTT_TEST
+ 	if (sm->air_bench) {
+ 		deny(sm, TXDENY_BENCH);	// the air interface bench transmits; PTT does nothing until it ends
+ 		return;
+@@ -7383,7 +7393,7 @@ static void hotspot_enter(radio_sm_t *sm, uint32_t rx_hz, uint32_t now_ms)
+ 	if (sm->hotspot || board.dmr == NULL || sm->ptt || sm->view.state == RS_TX || keyed || sm->dmr_killed) {
+ 		return;		// refused for now: the hotspot asks again
+ 	}
+-#if CONFIG_AIR_RAW
++#if CONFIG_AIR_RAW || CONFIG_M17_PTT_TEST
+ 	if (sm->air_bench) {
+ 		return;		// the air interface bench has the modem
+ 	}
+@@ -7458,7 +7468,7 @@ static void hotspot_leave(radio_sm_t *sm, uint32_t now_ms)
+ }
+ #endif
+ 
+-#if CONFIG_AIR_RAW
++#if CONFIG_AIR_RAW || CONFIG_M17_PTT_TEST
+ // --- The debug link's air interface bench (debuglink_air.h): it takes the modem as a hotspot does, and keys only
+ // through here ---
+ 
+@@ -7563,6 +7573,111 @@ static void bench_tick(radio_sm_t *sm, uint32_t now_ms)
+ }
+ #endif
+ 
++#if CONFIG_M17_PTT_TEST
++static const air_profile_t m17_profile = {
++	.sym_rate = 4800, .levels = 4, .shape = AIR_SHAPE_RRC, .shape_param = 50,
++	.dev_outer_hz = 2400, .timing = AIR_TIMING_CONTINUOUS, .bw = RADIO_BW_12K5, .idle = 0x77,
++};
++
++enum { M17_PTT = 1, M17_ARM = 2, M17_CAP_MS = 650 };
++
++// Read the physical contacts before key injection or user remapping.
++static unsigned m17_keys(void)
++{
++	uint32_t raw = input_raw_keys();
++	unsigned keys = 0;
++	for (unsigned i = 0; i < board.keymap_len; i++) {
++		const keymap_entry_t *key = &board.keymap[i];
++		if ((raw & (1u << key->bit)) != 0) {
++			if (key->short_action == ACT_PTT)
++				keys |= M17_PTT;
++			if (key->short_action == ACT_MONITOR)
++				keys |= M17_ARM;
++		}
++	}
++	return keys;
++}
++
++static bool m17_vfo(const radio_sm_t *sm)
++{
++	return sm->view.vfo && sm->view.ch.mode == RADIO_MODE_FM && sm->view.ch.tx_hz == sm->view.ch.rx_hz &&
++	       sm->view.scan == 0 && !sm->hotspot;
++}
++
++static void m17_event(const air_event_t *ev, void *ctx)
++{
++	radio_sm_t *sm = ctx;
++	if (ev->kind == AIR_EV_TX_DONE || ev->kind == AIR_EV_TX_UNDERRUN)
++		__atomic_store_n(&sm->m17_stop, true, __ATOMIC_RELEASE);
++}
++
++static bool m17_fill(radio_sm_t *sm)
++{
++	air_tx_chunk_t c = { .nsyms = AIR_CHUNK_SYMS_MAX };
++	_Static_assert(sizeof(m17_test_burst) % sizeof(c.syms) == 0, "whole modem chunks");
++	while (sm->m17_offset < sizeof(m17_test_burst) && board.air->tx_space() > 0) {
++		memcpy(c.syms, m17_test_burst + sm->m17_offset, sizeof(c.syms));
++		c.flags = sm->m17_offset + sizeof(c.syms) == sizeof(m17_test_burst) ? AIR_TX_LAST : 0;
++		if (!board.air->tx_queue(&c))
++			return false;
++		sm->m17_offset += sizeof(c.syms);
++	}
++	return true;
++}
++
++static void m17_close(radio_sm_t *sm, uint32_t now_ms)
++{
++	if (sm->m17_open) {
++		board.air->tx_abort();
++		bench_unkey(sm);
++		board.air->close();
++		sm->m17_open = false;
++	}
++	bench_leave(sm, now_ms);
++}
++
++static void m17_press(radio_sm_t *sm, int arg, uint32_t now_ms)
++{
++	if (arg == 0) {
++		if (sm->m17_open)
++			m17_close(sm, now_ms);
++		return;
++	}
++	bool armed = sm->m17_armed;
++	sm->m17_armed = false;
++	if (!armed || arg != RADIO_PTT_LOCAL_TEST || !m17_vfo(sm) || sm->view.state != RS_IDLE ||
++	    m17_keys() != (M17_ARM | M17_PTT) || ptt_line_stuck() || tx_check(sm) != TXDENY_NONE ||
++	    board.air == NULL || board.air->tx_chunk_syms != AIR_CHUNK_SYMS_MAX ||
++	    (board.air->fit(&m17_profile) & AIR_FIT_TX) == 0)
++		return;
++	activity(sm, now_ms);
++	bench_enter(sm, now_ms);
++	if (!sm->air_bench)
++		return;
++	sm->m17_offset = 0;
++	__atomic_store_n(&sm->m17_stop, false, __ATOMIC_RELEASE);
++	sm->m17_open = board.air->open(&m17_profile, m17_event, sm);
++	if (sm->m17_open && m17_fill(sm) && sm->m17_offset > 0 && m17_keys() == (M17_ARM | M17_PTT))
++		bench_key(sm, M17_CAP_MS, now_ms);
++	if (!sm->bench_keyed)
++		m17_close(sm, now_ms);
++}
++
++static void m17_tick(radio_sm_t *sm, uint32_t now_ms)
++{
++	unsigned keys = m17_keys();
++	if (!sm->m17_open) {
++		if (keys != (M17_ARM | M17_PTT))
++			sm->m17_armed = keys == M17_ARM && m17_vfo(sm);
++		return;
++	}
++	bench_tick(sm, now_ms);
++	if (!sm->bench_keyed || keys != (M17_ARM | M17_PTT) || ptt_line_stuck() || tx_held(sm) ||
++	    !tx_limit_allows(sm->view.ch.tx_hz) || __atomic_load_n(&sm->m17_stop, __ATOMIC_ACQUIRE) || !m17_fill(sm))
++		m17_close(sm, now_ms);
++}
++#endif
++
+ // --- Settings: what the radio was set to, back at power-on (core/settings), and saved when it changes ---
+ 
+ // The radio's own DMR ID, the codeplug's (set on the radio in Settings > My radio, which writes the codeplug). Taken
+@@ -9063,12 +9178,25 @@ static void bench_request(radio_sm_t *sm, const radio_req_t *req, uint32_t now_m
+ void radio_sm_request(radio_sm_t *sm, const radio_req_t *req, uint32_t now_ms)
+ {
+ 	sm->led_now = now_ms;
++#if CONFIG_M17_PTT_TEST
++	if (req->type == RREQ_PTT) {
++		m17_press(sm, req->arg, now_ms);
++		return;
++	}
++	if (req->type == RREQ_MONITOR && m17_vfo(sm))
++		return; // this build uses the physical monitor key to arm the test
++	if (sm->m17_open) {
++		if (req->type != RREQ_POWER_OFF)
++			return;
++		m17_close(sm, now_ms);
++	}
++#endif
+ 	uint8_t flags = req->type < RREQ_COUNT ? req_flags[req->type] : 0;
+ 	if ((flags & (RQ_ALERT | RQ_KEEP_APRS)) == 0) {
+ 		aprs_rf_abort(sm, now_ms);	// the user does something: an APRS transmission gives way
+ 	}
+ 	bool busy = sm->view.state == RS_TX || sm->hotspot;	// no retuning while transmitting or a hotspot
+-#if CONFIG_AIR_RAW
++#if CONFIG_AIR_RAW || CONFIG_M17_PTT_TEST
+ 	busy = busy || sm->air_bench;				// ... or while the air interface bench has the modem
+ #endif
+ 	if ((flags & RQ_ALERT) == 0) {
+@@ -9604,6 +9732,10 @@ static int16_t rssi_held(radio_sm_t *sm, int16_t rssi_dbm)
+ void radio_sm_poll(radio_sm_t *sm, uint32_t now_ms)
+ {
+ 	radio_status_t st;
++#if CONFIG_M17_PTT_TEST
++	if (sm->m17_open)
++		return;
++#endif
+ 	sm->led_now = now_ms;
+ 	if (sm->led_timed || sm->deny_led || ptt_line_stuck()) {
+ 		outputs(sm);	// as in radio_sm_tick: some paths below return before their outputs()
+@@ -9667,7 +9799,7 @@ void radio_sm_poll(radio_sm_t *sm, uint32_t now_ms)
+ 	own_rx = sm->aprs_phase == APRS_RF_OFF;
+ #endif
+ 	(void)own_rx;
+-#if CONFIG_AIR_RAW
++#if CONFIG_AIR_RAW || CONFIG_M17_PTT_TEST
+ 	if (sm->air_bench) {
+ 		outputs(sm);
+ 		return;		// the bench has the modem: no squelch, scan or time-out here (bench_tick caps a keying)
+@@ -9934,6 +10066,11 @@ static void t3_kv_retry(radio_sm_t *sm)
+ 
+ void radio_sm_tick(radio_sm_t *sm, uint32_t now_ms)
+ {
++#if CONFIG_M17_PTT_TEST
++	m17_tick(sm, now_ms);
++	if (sm->m17_open)
++		return;
++#endif
+ 	sm->led_now = now_ms;
+ 	if (codeplug_kv_serial() != kv_seen) {
+ #if CONFIG_DMR_AES
+@@ -9983,7 +10120,7 @@ void radio_sm_tick(radio_sm_t *sm, uint32_t now_ms)
+ 		air_tick(sm, now_ms);
+ 	}
+ #endif
+-#if CONFIG_AIR_RAW
++#if CONFIG_AIR_RAW || CONFIG_M17_PTT_TEST
+ 	if (sm->bench_keyed) {
+ 		bench_tick(sm, now_ms);
+ 	}
+diff --git a/core/radio/radio_sm.h b/core/radio/radio_sm.h
+index 18e0635b..09b02eec 100644
+--- a/core/radio/radio_sm.h
++++ b/core/radio/radio_sm.h
+@@ -349,7 +349,13 @@ typedef struct {
+ 	bool p25_talk;			// the transmission runs on the voice channel granted to us
+ #endif
+ #endif
+-#if CONFIG_AIR_RAW
++#if CONFIG_M17_PTT_TEST
++	bool m17_armed;			// observed the physical monitor key alone on the test VFO
++	bool m17_open;
++	bool m17_stop;			// modem callback -> radio task, atomic
++	uint16_t m17_offset;		// bytes accepted by the modem queue
++#endif
++#if CONFIG_AIR_RAW || CONFIG_M17_PTT_TEST
+ 	bool air_bench;			// the debug link's air interface bench has the modem (RREQ_AIR_BENCH)
+ 	bool bench_keyed;		// ... and the transmitter keyed for it (RREQ_AIR_TX)
+ 	uint16_t bench_max_ms;		// its cap
+diff --git a/core/radio/radio_task.c b/core/radio/radio_task.c
+index cf115404..659b0c4b 100644
+--- a/core/radio/radio_task.c
++++ b/core/radio/radio_task.c
+@@ -648,6 +648,9 @@ void radio_req_vfo_tx(uint32_t hz) { post(RREQ_VFO_TX, (int32_t)hz, 0); }
+ void radio_req_vfo_step_size(uint32_t hz) { post(RREQ_VFO_STEP_SIZE, (int32_t)hz, 0); }
+ // PTT and monitor edges must not be lost (a lost release would keep transmitting until the time-out)
+ void radio_req_ptt(bool down) { post(RREQ_PTT, down, pdMS_TO_TICKS(50)); }
++#if CONFIG_M17_PTT_TEST
++void radio_req_ptt_local_test(bool down) { post(RREQ_PTT, down ? RADIO_PTT_LOCAL_TEST : 0, pdMS_TO_TICKS(50)); }
++#endif
+ void radio_req_ptt_host(bool down) { post(RREQ_PTT, down ? 2 : 0, pdMS_TO_TICKS(50)); }
+ void radio_req_monitor(bool down) { post(RREQ_MONITOR, down, pdMS_TO_TICKS(50)); }
+ void radio_req_monitor_held_up(void) { post(RREQ_MONITOR, 2, pdMS_TO_TICKS(50)); }
+diff --git a/docs/spec/radio-features.md b/docs/spec/radio-features.md
+index 178d7ca0..c5ab4c10 100644
+--- a/docs/spec/radio-features.md
++++ b/docs/spec/radio-features.md
+@@ -805,3 +805,7 @@ On the radio (`docs/testing/on-air-coverage.md`, HIL 2026-10-10): zone scan stop
+ watch, the battery saver, the 1750 Hz burst and the roger beep on air; TX inhibit and the TOT warning on the radio's
+ state; VOX only in silence (the `mic_level` hook is unverified); whether PCM beeps play in FM mode is still open
+ (`beep.no_stream` / `beep.blocks` answer that).
++
++### Local M17 data burst for the bench
++
++The optional dedicated M17_PTT_TEST build reserves the radio core's transmitter for one fixed test vector. On an idle simplex FM VFO the monitor contact arms the physical PTT edge. Both contacts must stay down. The provider sends 432 packed bytes at 4800 symbols/s with its native four-level pulse shape. One preamble, one link setup, six data frames and one end marker span twelve 144-symbol modem chunks. The radio core requests power level zero. It closes the session on release, modem completion, underrun, failed queue, transmit inhibit or a 650 ms timeout evaluated by the radio task. Pulse shape and RF deviation require measurement.
+diff --git a/docs/user/08-fm.md b/docs/user/08-fm.md
+index e9c66735..21583a69 100644
+--- a/docs/user/08-fm.md
++++ b/docs/user/08-fm.md
+@@ -108,3 +108,7 @@ screen shows "DTMF" and the last digits sent.
+ - When the radio transmits on its own (an APRS beacon), or refuses to transmit ("NO TX"), the keys work as usual.
+ 
+ Stored DTMF codes and touch tone decoding are not built yet.
++
++### M17 bench image
++
++Only the dedicated experimental M17 PTT test build uses this gesture. After bench setup, select an idle FM VFO with equal receive and transmit frequencies and scanning off. Hold the physical monitor key, then press PTT while continuing to hold monitor. The TX indication accompanies one short data burst. Release either key to stop early. Release PTT before another attempt. The test uses the existing VFO and TX screen.
+diff --git a/tests/hil/features.toml b/tests/hil/features.toml
+index 686535c5..bfdb1938 100644
+--- a/tests/hil/features.toml
++++ b/tests/hil/features.toml
+@@ -607,3 +607,8 @@ spec = "docs/spec/usb-audio.md"
+ switch = "M17_FRAME_TEST"
+ spec = "docs/spec/debuglink.md"
+ manual = ["Read the m17 view and compare both frame records with the reference capture."]
++
++[feature.m17_ptt_test]
++switch = "M17_PTT_TEST"
++spec = "docs/spec/radio-features.md"
++manual = ["With a verified RF fixture, independently decode one physically armed test burst and confirm unkey."]
+diff --git a/tests/host/Makefile b/tests/host/Makefile
+index f4a5f97f..209cd52f 100644
+--- a/tests/host/Makefile
++++ b/tests/host/Makefile
+@@ -347,6 +347,12 @@ radioCoreTestP25: $(RCP25) $(wildcard $(CORE)/radio/*.h) $(wildcard $(CORE)/dmr/
+ 	$(CC) $(CFLAGS) $(CORE_HAL) -I. -DDMR_RX_TRACE=0 -DCONFIG_DMR_IP_GATEWAY=0 -DCONFIG_SFR=1 -DCONFIG_APRS=0 \
+ 		-DCONFIG_P25=1 -DCONFIG_AIR_RAW=1 -DCONFIG_SATELLITE_TLE=1 -DHAL_VOCODER_LEND_BYTES=0x4000 -o $@ $(RCP25) -lm
+ 
++# A dedicated bench image routes the physical PTT to a finite M17 test transmission.
++TESTS += radioCoreTestM17
++radioCoreTestM17: $(RCP25) $(wildcard $(CORE)/radio/*.h) $(wildcard $(CORE)/m17/*.h)
++	$(CC) $(CFLAGS) $(CORE_HAL) -I. -DDMR_RX_TRACE=0 -DCONFIG_DMR_IP_GATEWAY=0 -DCONFIG_SFR=1 -DCONFIG_APRS=0 \
++		-DCONFIG_P25=1 -DCONFIG_M17_PTT_TEST=1 -DCONFIG_SATELLITE_TLE=1 -DHAL_VOCODER_LEND_BYTES=0x4000 -o $@ $(RCP25) -lm
++
+ # The same with P25 trunking (CONFIG_P25_TRUNK): a trunked site on the fake air, the follower in the radio core
+ TESTS   += radioCoreTestP25T
+ RCP25T  := $(RCP25) $(CORE)/p25/p25_tsbk.c $(CORE)/p25/p25_follow.c
+@@ -500,10 +506,11 @@ boardBandTest: boardBandTest.c $(ROOT)/hal/board.h
+ 	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -o $@ boardBandTest.c
+ 
+ run: run-core
+-run-core: radioCoreTest radioCoreTestNoVfoDmr radioCoreTestP25 radioCoreTestP25T radioCoreTestNxdn radioCoreTestP25Nxdn radioCoreTestAprs radioCoreTestAprsDmr radioFeaturesTest radioFeaturesTestNoDual roamTest radioListenBandsTest inputTest switchFollowTest aprsRadioTest quadratureTest serialmicTest miclevelTest resampleTest \
++run-core: radioCoreTestM17 radioCoreTest radioCoreTestNoVfoDmr radioCoreTestP25 radioCoreTestP25T radioCoreTestNxdn radioCoreTestP25Nxdn radioCoreTestAprs radioCoreTestAprsDmr radioFeaturesTest radioFeaturesTestNoDual roamTest radioListenBandsTest inputTest switchFollowTest aprsRadioTest quadratureTest serialmicTest miclevelTest resampleTest \
+           rx2LinkTest keyassignTest powerSwitchTest powerKeyTest boardBandTest batteryTest
+ 	./aprsRadioTest
+ 	./radioCoreTest
++	./radioCoreTestM17
+ 	./radioCoreTestNoVfoDmr
+ 	./radioCoreTestP25
+ 	./radioCoreTestNxdn
+diff --git a/tests/host/radioCoreTest.c b/tests/host/radioCoreTest.c
+index 720cd6f9..010e9055 100644
+--- a/tests/host/radioCoreTest.c
++++ b/tests/host/radioCoreTest.c
+@@ -241,7 +241,11 @@ static bool rx_ext_on;
+ static const char *const power_names[] = { "L", "M", "H" };
+ // Keys: only what the side key glue (ui_svc_storage.c) needs, two side keys and an arrow programmable on Home
+ static const keymap_entry_t keymap[] = {
++	#if CONFIG_M17_PTT_TEST
++	{ 0, ACT_PTT, ACT_PTT, true, false, 0 },
++#else
+ 	{ 0, ACT_SELECT, ACT_SELECT, false, false, 0 },
++#endif
+ 	{ 1, ACT_MONITOR, ACT_MONITOR, true, false, 0 },
+ 	{ 2, ACT_TALK_TARGET, ACT_USER_2, false, false, 0 },
+ 	{ 3, ACT_NAV_LEFT, ACT_USER_1, false, true, 0 },
+@@ -7510,6 +7514,7 @@ static void test_p25_vfo(void)
+ }
+ 
+ // The air interface bench (CONFIG_AIR_RAW): it holds the modem and keys at the lowest power (debuglink.md 3.28)
++#if CONFIG_AIR_RAW
+ static void test_air_bench(void)
+ {
+ 	setup_codeplug_p25();
+@@ -7559,6 +7564,8 @@ static void test_air_bench(void)
+ 	CHECK(!sm.air_bench && radio_p25_running());
+ }
+ 
++#endif
++
+ // The codec's side (core/p25/p25_codeplug.c, tested in p25CodeplugTest): a stored channel's set-up, by number, and
+ // the radio-wide unit ID
+ static p25_conv_cfg_t stored_p25[NCH + 1];
+@@ -8569,7 +8576,9 @@ static void test_p25(void)
+ 	test_p25_denied();
+ 	test_p25_leave();
+ 	test_p25_vfo();
++#if CONFIG_AIR_RAW
+ 	test_air_bench();
++#endif
+ 	// Off P25 for the tests after: an FM channel, nothing of P25 left running
+ 	setup_codeplug();
+ 	req(RREQ_RELOAD, 0);
+@@ -11752,8 +11761,112 @@ static void test_t3_stun(void)
+ }
+ #endif
+ 
+-int main(void)
++#if CONFIG_M17_PTT_TEST
++static unsigned physical_keys;
++static uint8_t transmitted[12 * (AIR_CHUNK / 4)];
++static size_t captured;
++uint32_t input_raw_keys(void) { return physical_keys; }
++static void m17_keys(unsigned keys)
++{
++	physical_keys = keys;
++	now += RADIO_TICK_MS;
++	radio_sm_tick(&sm, now);
++}
++static void m17_press(void)
+ {
++	m17_keys(0);
++	m17_keys(2); // monitor alone arms the next physical press
++	physical_keys = 3;
++	req(RREQ_PTT, RADIO_PTT_LOCAL_TEST);
++}
++static void test_m17_ptt(void)
++{
++	setup_codeplug();
++	start();
++	m17_press();
++	CHECK(!hw.keyed && !fair[0].open); // memory channel
++	req(RREQ_VFO, 1);
++	CHECK(sm.view.vfo && sm.view.ch.mode == RADIO_MODE_FM);
++	m17_keys(3);
++	req(RREQ_PTT, RADIO_PTT_LOCAL_TEST);
++	CHECK(!hw.keyed); // held keys across a mode change
++	m17_keys(0);
++	req(RREQ_PTT, RADIO_PTT_LOCAL_TEST);
++	CHECK(!hw.keyed); // synthesized press
++	m17_keys(2);
++	physical_keys = 3;
++	req(RREQ_PTT, 1);
++	CHECK(!hw.keyed); // ordinary host PTT while both contacts are down
++	m17_keys(2);
++	physical_keys = 3;
++	req(RREQ_PTT, 2);
++	CHECK(!hw.keyed); // host audio
++	sm.set.tx_inhibit = true;
++	m17_press();
++	CHECK(!hw.keyed && !fair[0].open);
++	sm.set.tx_inhibit = false;
++	air_nofit = true;
++	m17_press();
++	CHECK(!hw.keyed && !fair[0].open);
++	air_nofit = false;
++	tx_fail = true;
++	m17_press();
++	CHECK(!hw.keyed && !fair[0].open);
++	tx_fail = false;
++	sm.view.ch.tx_hz += 500000;
++	m17_press();
++	CHECK(!hw.keyed && !fair[0].open);
++	sm.view.ch.tx_hz = sm.view.ch.rx_hz;
++	m17_press();
++	CHECK(hw.keyed && hw.tx_power == 0 && fair[0].on && fair[0].qn == AIR_DEPTH);
++	for (unsigned i = 0; i < 12 && fair[0].on; i++) {
++		CHECK(fair[0].q[0].nsyms == 144);
++		CHECK(fair[0].q[0].flags == (i == 11 ? AIR_TX_LAST : 0));
++		memcpy(transmitted + captured, fair[0].q[0].syms, sizeof(fair[0].q[0].syms));
++		captured += sizeof(fair[0].q[0].syms);
++		air_step1(0);
++		now += 30;
++		radio_sm_tick(&sm, now);
++	}
++	CHECK(captured == sizeof(transmitted));
++	CHECK(!hw.keyed && !fair[0].open && hw_mode == RADIO_MODE_FM);
++	req(RREQ_PTT, RADIO_PTT_LOCAL_TEST);
++	CHECK(!hw.keyed); // held through completion
++	m17_press();
++	CHECK(hw.keyed);
++	m17_keys(2); // dropped release message, physical PTT up
++	CHECK(!hw.keyed && !fair[0].open);
++	m17_press();
++	m17_keys(1); // arm button released first
++	CHECK(!hw.keyed && !fair[0].open);
++	m17_press();
++	req(RREQ_PTT, 0);
++	CHECK(!hw.keyed && !fair[0].open);
++	m17_press();
++	air_ev(&fair[0], AIR_EV_TX_UNDERRUN, NULL);
++	m17_keys(3);
++	CHECK(!hw.keyed && !fair[0].open);
++	now = UINT32_MAX - 100;
++	m17_press();
++	CHECK(hw.keyed);
++	now += 650; // missing modem completion across clock wrap
++	radio_sm_tick(&sm, now);
++	CHECK(!hw.keyed && !fair[0].open);
++}
++#endif
++
++int main(int argc, char **argv)
++{
++#if CONFIG_M17_PTT_TEST
++	test_m17_ptt();
++	if (!failures && argc == 3 && strcmp(argv[1], "--capture") == 0) {
++		FILE *out = fopen(argv[2], "wb");
++		if (out == NULL || fwrite(transmitted, 1, captured, out) != captured || fclose(out) != 0)
++			return 1;
++	}
++	printf("# radioCoreTestM17: %d checks, %s\n", checks, failures ? "FAILED" : "PASSED");
++	return failures != 0;
++#endif
+ 	test_tx_limit_op();
+ 	test_startup();
+ #if CONFIG_SATELLITE_TLE
+-- 
+2.53.0
+

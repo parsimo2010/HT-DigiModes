@@ -2,13 +2,14 @@
 import argparse
 import hashlib
 import math
+import os
 from pathlib import Path
 
 from gnuradio import analog, blocks, digital, filter, gr, m17
 from gnuradio.filter import firdes
 
 
-def receive(source, rate, seconds):
+def receive(source, rate, seconds, capture=None):
     graph = gr.top_block("M17 receive test")
     limit = blocks.head(gr.sizeof_gr_complex, int(rate * seconds))
     graph.connect(source, limit)
@@ -23,6 +24,10 @@ def receive(source, rate, seconds):
     decoder = m17.m17_decoder(True, False, 2.0, 30.0, False, False, 0, "", "", "", 0)
     sink = blocks.vector_sink_b()
     graph.connect(limit, channel, fm, matched, timing, decoder, sink)
+    if capture is not None:
+        # The sink owns the descriptor. Preserve prior captures and keep new ones private.
+        fd = os.open(capture, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        graph.connect(limit, blocks.file_descriptor_sink(gr.sizeof_gr_complex, fd))
     graph.run()
     return bytes(sink.data())
 
@@ -37,7 +42,11 @@ def main():
     parser.add_argument("--frequency-hz", type=int)
     parser.add_argument("--antenna", help="verified channel 0 receive port")
     parser.add_argument("--check-ramp", action="store_true", help="expect the lab fixture's 00..0f payload")
+    parser.add_argument("--expect-frames", type=int, help="require this exact number of complete payloads")
+    parser.add_argument("--capture-iq", type=Path, help="save the limited input to a new private complex float32 file")
     args = parser.parse_args()
+    if args.expect_frames is not None and args.expect_frames <= 0:
+        parser.error("--expect-frames must be positive")
     if args.iq is not None:
         if args.antenna or args.frequency_hz is not None:
             parser.error("tuning options require --sdr-args")
@@ -55,10 +64,12 @@ def main():
         source.set_antenna(args.antenna, 0)
         source.set_center_freq(args.frequency_hz, 0)
 
-    payload = receive(source, args.rate, args.seconds)
+    payload = receive(source, args.rate, args.seconds, args.capture_iq)
     if not payload or len(payload) % 16:
         raise SystemExit("No complete M17 stream or partial payload output")
     frames = len(payload) // 16
+    if args.expect_frames is not None and frames != args.expect_frames:
+        raise SystemExit(f"Expected {args.expect_frames} complete payloads, decoded {frames}")
     if args.check_ramp and payload != bytes(range(16)) * frames:
         raise SystemExit("Decoded data differs from the expected ramp")
     print(f"{frames} complete payloads, SHA-256 {hashlib.sha256(payload).hexdigest()}")
