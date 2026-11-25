@@ -21,3 +21,31 @@ Host preparation used an isolated `~/ht-m17/libresdr/trial-200t` directory and `
 Windows commands used were usbipd list, bind and attach for the SDR. With `UHD_IMAGES_DIR=$PWD`, the first `timeout 30 uhd_find_devices --args type=b200` loaded FX3 RAM. Discovery succeeded after USB re-enumeration and reattachment. `timeout 60 uhd_usrp_probe --args "type=b200,fw=$PWD/usrp_b200_fw.hex,fpga=$PWD/usrp_b210_fpga.bin"` selected the 200T ZIP member. UHD reported USB 3 and then a register acknowledgement timeout (`wait_for_ack`, `accum_timeout < _timeout`). Reopening with the same arguments failed again. The ZIP image did not qualify on this setup. USB discovery by itself does not establish FPGA or receive streaming compatibility.
 
 Qualification requires a successful initialized probe and nonzero RX samples in a five-second 960 ksample/s test with no drops, overruns, sequence errors or timeouts. The [M17 receiver and replay results](../../docs/libresdr-inventory.md) are tested independently of the SDR. Raw USB/UHD logs stay outside Git.
+
+## Qualified image and receive test
+
+**LAB-003 passed for channel 0 at 960 ksample/s on 2026-11-25.** The loose `libresdr_b210.bin` in the inventory worked. Its identical copy is `usrp_b210_fpga (2).bin`. UHD explicitly logged loading the loose image over USB 3, passed both register loopback tests, and reported firmware 8.0, FPGA 16.0 and two receive and two transmit frontends. The host requested and received a 16 MHz master clock during probe and 61.44 MHz during streaming. These are UHD readbacks.
+
+The five-second channel 0 RX benchmark received 4,800,627 samples with zero drops, overruns, RX sequence errors, late commands and timeouts. Transmitted sample count was zero. This establishes a working SDR-to-host sample path. A known RF signal and over-the-air M17 decoding still need bench validation. Testing stopped at the first passing image. The 75T archive, the loose file with target ID 03631093, and the other distinct 200T image (`c503101c…`) were never loaded.
+
+The operator requested leaving the SDR attached to Ubuntu. Windows reported `USRP B200` attached on bus 3-2 after the test. The FPGA load is volatile. For subsequent lab sessions the two runtime files are stored under `~/.local/share/ht-digimodes/libresdr/uhd-4.9.0.1-7322a2a9/` in Ubuntu. The selected FPGA bytes are named `usrp_b210_fpga.bin` there. The SHA-256 of both finalized files matched the trial originals. The local lab environment `~/ht-m17/env.sh` now exports this directory as `UHD_IMAGES_DIR`.
+
+Host-only selection and verification in a new Ubuntu shell:
+
+```bash
+source ~/ht-m17/env.sh
+uhd_config_info --images-dir
+sha256sum "$UHD_IMAGES_DIR/usrp_b210_fpga.bin" "$UHD_IMAGES_DIR/usrp_b200_fw.hex"
+```
+
+The device commands actually run for the passing trial were:
+
+```bash
+cd ~/ht-m17/libresdr/trial-200t
+export UHD_IMAGES_DIR="$PWD"
+args="type=b200,fw=$PWD/usrp_b200_fw.hex,fpga=$PWD/libresdr_b210.bin"
+timeout 60 uhd_usrp_probe --args "$args"
+timeout 30 /usr/libexec/uhd/examples/benchmark_rate --args "$args" --rx_rate 960000 --duration 5
+```
+
+The probe and benchmark both exited 0. Logs are `libresdr_b210.bin.probe.log` and `libresdr_b210.bin.rx.log` in the trial directory. The board marking and physical RF input limit remain unverified.

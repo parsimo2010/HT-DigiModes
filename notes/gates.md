@@ -20,3 +20,7 @@ The operator confirmed basic FM/DMR operation before any change and separately a
 LAB-004, M17-001 and the local LAB-009 build passed on the computer. UHD is installed. LAB-003 device inventory, LAB-006 fixture verification, LAB-007 instrumented stock captures, factory calibration readback and LAB-008 on-radio validation remain open. The [exact offline erase/write preview and bench worksheet](dm1701-bench.md) cover the plain comparison build. The tested stock fallback is still installed. NOT RUN ON HARDWARE.
 
 The [M17 frame-generator test build](dm1701-m17-frame-build.md) has its own private DMR-codec-merged image, reproducible checksum and nine-sector offline write preview. Its read-only diagnostic passed in CPU emulation. Hardware gates remain open.
+
+## LibreSDR receive path | 2026-11-25
+
+LAB-003 passed for the connected LibreSDR on USB 3 with the qualified FPGA image: channel 0 sustained 960 ksample/s for five seconds with zero drops, overruns and RX timeouts. [Image selection, exact hashes, commands and results](../hardware/libresdr/qualification.md). LAB-006 fixture verification and LAB-007 instrumented stock-radio captures remain open. The DM-1701 firmware and RF gates are unchanged.
