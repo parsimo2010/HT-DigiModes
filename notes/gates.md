@@ -26,3 +26,9 @@ The [M17 frame-generator test build](dm1701-m17-frame-build.md) has its own priv
 LAB-003 passed for the connected LibreSDR on USB 3 with the qualified FPGA image: channel 0 sustained 960 ksample/s for five seconds with zero drops, overruns and RX timeouts. [Image selection, exact hashes, commands and results](../hardware/libresdr/qualification.md). LAB-006 fixture verification and LAB-007 instrumented stock-radio captures remain open. The DM-1701 firmware and RF gates are unchanged.
 
 The [physical PTT test image and its sector-by-sector preview](dm1701-m17-ptt.md) passed the host radio-core and independent GNU Radio decoder tests. The DM-1701 to LibreSDR RF result is pending. The stock firmware is still installed.
+
+## Proposed 425.525 MHz simplex test
+
+The operator reports that the DM-1701 is in DFU and that the DM-1701 and LibreSDR each have a stub antenna a few feet apart in open air. There is no coupler or attenuator. LAB-006 remains open. The separation and burst duration do not establish a maximum peak input level for the SDR. The instrumented stock baseline is also outstanding.
+
+The private candidate’s SHA-256 matched the build record. The pinned writer completed an offline DM-1701 dry run using the model key verified from the private stock package. The plan covers 976 blocks in MCU sectors 3–11, from 0x0800C000 up to 0x08100000 exclusive. The bootloader and external calibration registers are outside the write plan. No USB, flash or RF operation was performed. The factory calibration backup is pending first boot.
