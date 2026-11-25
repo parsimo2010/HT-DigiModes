@@ -12,7 +12,13 @@
 - The operator confirmed transmit and receive in both analog FM and DMR on the DM-1701 and DM-1801 Pro. These are functional smoke tests, not instrumented RF measurements.
 - The DM-1701 is the active development target. Its normal menu reports firmware `D012.006` and CP version `V01.05`. The operator reported it powered on at its regular screen with native USB attached.
 - The second radio is confirmed as a DM-1801 Pro. Its board revision, cable and factory backup status remain unverified.
-- No codeplug, installed firmware or calibration backup has been captured yet.
+- No codeplug, installed firmware or calibration had been captured at the time of the bench report.
+
+## DM-1701 stock codeplug backup
+
+- After explicit operator approval, passed the normally booted DM-1701 through to Ubuntu using usbipd-win 5.3.0 and ran `dmrconf --radio dm1701 --bin read` with dmrconf 0.13.3. The read exited successfully. USB sharing was removed afterward.
+- The DfuSe binary is 844,093 bytes. dmrconf decoded it offline, and both files have verified SHA-256 hashes in a private manifest. No backup contents or unit-specific identifiers are in Git.
+- The file covers two codeplug data ranges, not the installed MCU firmware or factory SPI security registers. The documented working calibration window within the file was all zero, so there is no usable calibration backup from this read. No write, flash, or RF test was run.
 
 ## Remaining arrival checklist
 
@@ -22,7 +28,7 @@
 - DM-1801 Pro board revision:
 - DM-1801 stock firmware version:
 - DM-1801 cable type / read-only serial result:
-- Factory codeplug backup status (keep artifact paths and hashes in the private manifest):
+- Second offline copy of the DM-1701 codeplug and private manifest:
 - Firmware/codec/calibration backup status (keep artifact paths and hashes in the private manifest):
 - Instrumented RF baselines (separate from functional smoke tests):
 - LibreSDR UHD model / clock / FPGA image:

@@ -4,7 +4,7 @@ A research lab to develop standalone M17 on a Baofeng DM-1701 and host-assisted 
 
 **Start here:** [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md) and [`AGENTS.md`](AGENTS.md).
 
-**Status:** The operator confirmed basic analog FM and DMR transmit and receive on both handhelds. Windows enumerated the DM-1701 over USB. No protocol backup, firmware change, or instrumented RF measurement has been performed. See the [arrival log](notes/arrival-session.md).
+**Status:** The operator confirmed basic analog FM and DMR transmit and receive on both handhelds. The DM-1701 stock codeplug was backed up and verified privately. Installed firmware and factory calibration are not backed up. No firmware change or instrumented RF measurement has been performed. See the [arrival log](notes/arrival-session.md).
 
 ## Host-only quick start
 
