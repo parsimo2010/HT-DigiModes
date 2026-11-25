@@ -1,5 +1,7 @@
 # DM-1701 bench handoff | HOLD | 2026-11-24
 
+**Current status.** The operator has completed the first on-air DM-1701 M17 data test. The earlier preparation record follows. [Hardware result and factory backup](dm1701-m17-first-rf.md).
+
 The operator reports normal operation on Radioddity V02.03 CSV, menu V002.003. The USB update route and this stock fallback were tested. D012.006 was never dumped. Keep the existing private channel backup. Channel migration is optional. Factory calibration still needs a private readback. No approval is pending for a flash or transmission.
 
 ## Offline preview of the built image

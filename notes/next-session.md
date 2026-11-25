@@ -1,5 +1,7 @@
 # DM-1701 M17 development handoff
 
+**Current status.** The operator has completed the first on-air DM-1701 M17 data test. The earlier preparation record follows. [Hardware result and factory backup](dm1701-m17-first-rf.md).
+
 The DM-1701 runs Radioddity V02.03 CSV and the operator confirmed normal operation. The menu shows `V002.003`. This is the stock firmware we can return to through the tested USB update route. The previous `D012.006` installation was not dumped. The channel backup exists, but retaining the channels for M17 is not a requirement.
 
 Read [AGENTS.md](../AGENTS.md), the [development plan](../docs/DEVELOPMENT_PLAN.md), and the [arrival log](arrival-session.md). Use the [pinned upstream revisions](upstream-lock.md). Firmware files and backups are private and outside Git.
