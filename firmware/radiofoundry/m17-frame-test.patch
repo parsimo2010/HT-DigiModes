@@ -1,0 +1,387 @@
+From c116f87424eba7735dc112b820a24e96e7e2203b Mon Sep 17 00:00:00 2001
+From: HT DigiModes Lab <lab@localhost>
+Date: Tue, 24 Nov 2026 21:40:40 -0700
+Subject: [PATCH] Add read-only M17 frame generation to the debug view
+
+---
+ Makefile                        |  6 +++
+ config/features.mk              |  5 +-
+ core/config.h                   |  3 ++
+ core/debuglink/debuglink.h      |  5 ++
+ core/debuglink/debuglink_view.c | 11 +++-
+ core/m17/m17_frame.c            | 89 +++++++++++++++++++++++++++++++++
+ core/m17/m17_frame.h            | 14 ++++++
+ core/m17/m17_view.c             | 29 +++++++++++
+ docs/spec/debuglink.md          |  1 +
+ tests/hil/features.toml         |  5 ++
+ tests/host/Makefile             |  6 +++
+ tests/host/m17FrameTest.c       | 27 ++++++++++
+ tools/rfoundry_debug.py         |  2 +-
+ 13 files changed, 200 insertions(+), 3 deletions(-)
+ create mode 100644 core/m17/m17_frame.c
+ create mode 100644 core/m17/m17_frame.h
+ create mode 100644 core/m17/m17_view.c
+ create mode 100644 tests/host/m17FrameTest.c
+
+diff --git a/Makefile b/Makefile
+index 535ec416..54a079a3 100644
+--- a/Makefile
++++ b/Makefile
+@@ -147,6 +147,12 @@ endif
+ APP_DIRS := $(CORE_DIRS) $(PLATFORM_DIRS) $(BOARD_DIRS)
+ # Sorted: the link order steers LTO's code, and $(wildcard)'s order depends on the make (gotchas 13.10)
+ APP_SRC := $(foreach d,$(APP_DIRS),$(sort $(wildcard $(d)/*.c)))
++ifeq ($(CONFIG_M17_FRAME_TEST),y)
++APP_SRC += core/m17/m17_frame.c core/m17/m17_view.c
++ifneq ($(CONFIG_AIR),y)
++APP_SRC += core/fec/conv.c core/fec/golay.c
++endif
++endif
+ APP_ASM := $(foreach d,$(APP_DIRS),$(sort $(wildcard $(d)/*.S)))
+ # The stub entry without the debug link: its listener uses the debug link's framing (dl_frame.c, no RTOS or board)
+ ifeq ($(CONFIG_STUB_ENTRY)$(CONFIG_DEBUGLINK),yn)
+diff --git a/config/features.mk b/config/features.mk
+index f08f4e2e..1f99e6a4 100644
+--- a/config/features.mk
++++ b/config/features.mk
+@@ -336,6 +336,8 @@ CONFIG_MBE := $(CONFIG_IMBE)
+ # diagnostics: debug link commands that open an air interface session and move raw symbols, for bench tests (needs an
+ # air-framed mode such as P25 or NXDN, and DEBUGLINK; docs/spec/debuglink.md)
+ CONFIG_AIR_RAW ?= n
++# Read-only M17 frame generator in the debug view.
++CONFIG_M17_FRAME_TEST ?= n
+ # P25 trunked: the codec of its systems and channels (docs/spec/p25-codeplug.md 3), a control channel decoded and voice
+ # channel grants followed, and where the system allows it registration, voice requests and transmit on the grant
+ # (core/p25/p25_follow.c, docs/spec/p25-trunking.md). Needs P25
+@@ -351,7 +353,7 @@ CONFIG_SATELLITE_TLE ?= $(if $(filter y,$(CONFIG_DEBUGLINK)),y,n)
+ 
+ FEATURES := USB_SERIAL_REQUEST FM SUBTONE DMR DMR_PRIVACY DMR_AES DMR_TALKER_ALIAS DMR_GPS DMR_SMS DMR_TMS DMR_ARS DMR_LRRP DMR_SIGNALING DMR_EMERGENCY DMR_ROAMING DMR_TRUNK DMR_TRUNK_TX DMR_TRUNK_SUPL DMR_TRUNK_GW VOICE_CAPTURE DMR_IP_GATEWAY ZONE_SHARE DMR_UDP_COMPRESS NET_TCP NET_KISS NET_HTTP NET_HTTP_GZIP NET_WEBCTL NET_RADIO_UDP NET_RIGCTL NET_APRSIS NET_USRP MDNS TFTP TFTP_IDDB IDDB_COMPACT DMR_CONTROL_STATION SNMP SFR SFR_DUALPATH_RX SFR_CWID TASK_STACKS \
+ 	USB HOSTLINK USB_NETWORK NET_PPP HOTSPOT HOTSPOT_SPLIT DEBUGLINK CPS_OPENFW CPS_FAST VFO VFO_FM VFO_DMR DIAG BACKLIGHT_TEST FONT_XL FONT_AA FONT_BIG LANG_ES LANG_IT LANG_FR LANG_ZH CJK_GLYPHS LANG_DEFAULT_ES LANG_DEFAULT_IT LANG_DEFAULT_FR LANG_DEFAULT_ZH UI_COLOR UI_SETTINGS SCAN DUAL_WATCH BEEP SIG_TONES FM_TX_TONES DTMF \
+-	RX_EXT VOX REF_TRIM BATTERY_SAVE VIBRATE GPS AUDIO_PROBE STUB_ENTRY NAND_STORAGE CRASH_LOG CRASH_SCREEN CRASH_REPORT WATCHDOG SUPPORT_INFO FAULT_TRACE AM_RX BCAST_FM APRS APRS_AFSK APRS_DMR APRS_RX APRS_IGATE GPS_SKY SATELLITE_TLE KEY_ASSIGN CHANNEL_LIST CHANNEL_EDIT ZONE_EDIT CONTACT_EDIT VOLUME_BAR P25 P25_TRUNK NXDN NXDN_SCRAMBLER AIR_RAW
++	RX_EXT VOX REF_TRIM BATTERY_SAVE VIBRATE GPS AUDIO_PROBE STUB_ENTRY NAND_STORAGE CRASH_LOG CRASH_SCREEN CRASH_REPORT WATCHDOG SUPPORT_INFO FAULT_TRACE AM_RX BCAST_FM APRS APRS_AFSK APRS_DMR APRS_RX APRS_IGATE GPS_SKY SATELLITE_TLE KEY_ASSIGN CHANNEL_LIST CHANNEL_EDIT ZONE_EDIT CONTACT_EDIT VOLUME_BAR P25 P25_TRUNK NXDN NXDN_SCRAMBLER AIR_RAW M17_FRAME_TEST
+ 
+ # The panel's width in pixels: the display class the board's board.toml names (hardware.gallery = "160x128", the width
+ # first). Empty when it names none, which counts as a narrow panel
+@@ -421,6 +423,7 @@ $(if $(and $(call feature_on,P25_TRUNK),$(if $(call feature_on,P25),,x)),$(error
+ $(if $(and $(call feature_on,P25),$(if $(call feature_on,DMR),,x)),$(error CONFIG_P25=y needs CONFIG_DMR=y (its talk groups are the codeplug's contacts)))
+ $(if $(and $(call feature_on,NXDN),$(if $(call feature_on,DMR),,x)),$(error CONFIG_NXDN=y needs CONFIG_DMR=y (its voice is the DMR vocoder's)))
+ $(if $(and $(call feature_on,AIR_RAW),$(if $(call feature_on,DEBUGLINK),,x)),$(error CONFIG_AIR_RAW=y needs CONFIG_DEBUGLINK=y))
++$(if $(and $(call feature_on,M17_FRAME_TEST),$(if $(call feature_on,DEBUGLINK),,x)),$(error CONFIG_M17_FRAME_TEST=y needs CONFIG_DEBUGLINK=y))
+ ifneq ($(call feature_on,DEBUGLINK),)
+   ifeq ($(call feature_on,HOSTLINK),)
+     $(error CONFIG_DEBUGLINK=y needs CONFIG_HOSTLINK=y)
+diff --git a/core/config.h b/core/config.h
+index 17bd8054..d79ec52e 100644
+--- a/core/config.h
++++ b/core/config.h
+@@ -354,6 +354,9 @@
+ #ifndef CONFIG_P25_TRUNK
+ #define CONFIG_P25_TRUNK		0
+ #endif
++#ifndef CONFIG_M17_FRAME_TEST
++#define CONFIG_M17_FRAME_TEST 0
++#endif
+ #ifndef CONFIG_AIR_RAW
+ #define CONFIG_AIR_RAW			0
+ #endif
+diff --git a/core/debuglink/debuglink.h b/core/debuglink/debuglink.h
+index 0095de15..f3567b94 100644
+--- a/core/debuglink/debuglink.h
++++ b/core/debuglink/debuglink.h
+@@ -8,6 +8,7 @@
+ 
+ #include <stdbool.h>
+ #include <stdint.h>
++#include "config.h"
+ #include "app/task_stack.h"
+ #include "debuglink/dl_fmt.h"
+ #include "hal_vocoder.h"
+@@ -58,6 +59,9 @@ enum {
+ 	DL_VIEW_P25,		// P25 on the channel: the call, settings, engine and voice counters (debuglink_view_p25.c)
+ 	DL_VIEW_P25_TRUNK,	// a trunked P25 channel's follower: system, channels, call followed, counters (the same file)
+ 	DL_VIEW_NXDN,		// NXDN on the channel: the call, settings, the provider's fit, engine counters (debuglink_view_nxdn.c)
++#if CONFIG_M17_FRAME_TEST
++	DL_VIEW_M17,
++#endif
+ 	DL_VIEW_COUNT
+ };
+ #define DL_VIEW_VERSION		5	// bumped when a key changes meaning or goes away (new keys don't bump it)
+@@ -151,6 +155,7 @@ void debuglink_view_net(dl_text_t *t);
+ void debuglink_view_net_svc(dl_text_t *t);
+ // The air section (debuglink_view_air.c): "airq.built=0" / "zs.built=0" without the air queue / zone sharing
+ void debuglink_view_air(dl_text_t *t);
++void debuglink_view_m17(dl_text_t *t);
+ // The SNMP agent (debuglink_snmp.c): the snmp section and the SNMP command; without CONFIG_SNMP "snmp.built=0" /
+ // unavailable
+ void debuglink_view_snmp(dl_text_t *t);
+diff --git a/core/debuglink/debuglink_view.c b/core/debuglink/debuglink_view.c
+index eaca6313..ba01ed0c 100644
+--- a/core/debuglink/debuglink_view.c
++++ b/core/debuglink/debuglink_view.c
+@@ -599,7 +599,11 @@ static const char *const section_names[DL_VIEW_COUNT] = { "core", "channel", "dm
+ 						  "dmr_data_stats", "roam", "aprs", "aprs_set", "dmr_ip", "net", "snmp", "usrp",
+ 						  "sfr", "tasks", "crash", "watchdog", "reset", "air", "net_svc",
+ 						  "net_link", "cps", "board", "audio", "t3", "t3_svc", "t3_roam", "voice_cap", "t3_msg",
+-						  "t3_ra", "p25", "p25_trunk", "nxdn" };
++						  "t3_ra", "p25", "p25_trunk", "nxdn",
++#if CONFIG_M17_FRAME_TEST
++	"m17",
++#endif
++};
+ 
+ const char *debuglink_view_name(uint8_t section)
+ {
+@@ -734,6 +738,11 @@ void debuglink_view_section(uint8_t section, const radio_view_t *v, dl_text_t *t
+ 	case DL_VIEW_P25_TRUNK:
+ 		debuglink_view_p25_trunk(t);
+ 		break;
++#if CONFIG_M17_FRAME_TEST
++	case DL_VIEW_M17:
++		debuglink_view_m17(t);
++		break;
++#endif
+ 	case DL_VIEW_NXDN:
+ 		debuglink_view_nxdn(v, t);
+ 		break;
+diff --git a/core/m17/m17_frame.c b/core/m17/m17_frame.c
+new file mode 100644
+index 00000000..14be1f65
+--- /dev/null
++++ b/core/m17/m17_frame.c
+@@ -0,0 +1,89 @@
++// SPDX-License-Identifier: MIT
++// Copyright (c) 2026 The RadioFoundry Authors
++// M17 Protocol Specification, channel coding and appendices B-F.
++#include "m17_frame.h"
++#include "fec/conv.h"
++#include "fec/golay.h"
++#include <string.h>
++
++static const uint8_t randomizer[46] = {
++	0xd6,0xb5,0xe2,0x30,0x82,0xff,0x84,0x62,0xba,0x4e,0x96,0x90,0xd8,0x98,0xdd,0x5d,
++	0x0c,0xc8,0x52,0x43,0x91,0x1d,0xf8,0x6e,0x68,0x2f,0x35,0xda,0x14,0xea,0xcd,0x76,
++	0x19,0x8d,0xd5,0x80,0xd1,0x33,0x87,0x13,0x57,0x18,0x2d,0x29,0x78,0xc3
++};
++static const fec_conv_code_t convolution = {0x19, 0x17};
++
++static unsigned bit(const uint8_t *data, unsigned i)
++{
++	return (data[i / 8] >> (7 - (i % 8))) & 1u;
++}
++
++// Append the retained bits into a zeroed buffer (after the LICH for a stream).
++static void puncture(const uint8_t *encoded, unsigned count, uint8_t coded[46], unsigned at, bool link)
++{
++	for (unsigned i = 0; i < count; i++) {
++		unsigned phase = i % 61;
++		bool drop = link ? (phase % 4 == 2) : (i % 12 == 11);
++		if (!drop) {
++			coded[at / 8] |= bit(encoded, i) << (7 - at % 8);
++			at++;
++		}
++	}
++}
++
++static void channel_frame(uint16_t sync, const uint8_t coded[46], uint8_t frame[M17_FRAME_BYTES])
++{
++	frame[0] = sync >> 8;
++	frame[1] = (uint8_t)sync;
++	memcpy(frame + 2, randomizer, sizeof(randomizer));
++	for (unsigned i = 0; i < 368; i++) {
++		unsigned j = (45u * i + 92u * i * i) % 368;
++		frame[2 + i / 8] ^= bit(coded, j) << (7 - i % 8);
++	}
++}
++
++void m17_link_frame(const uint8_t link[28], uint8_t frame[M17_FRAME_BYTES])
++{
++	uint16_t crc = 0xffff;
++	uint8_t input[31] = {0};  // CRC and four zero tail bits
++	uint8_t encoded[61] = {0}, coded[46] = {0};
++
++	memcpy(input, link, 28);
++	for (unsigned i = 0; i < 224; i++) {
++		unsigned feedback = (crc >> 15) ^ bit(link, i);
++		crc = (uint16_t)((crc << 1) ^ (feedback ? 0x5935 : 0));
++	}
++	input[28] = crc >> 8;
++	input[29] = (uint8_t)crc;
++	fec_conv_encode(&convolution, input, 244, encoded);
++	puncture(encoded, 488, coded, 0, true);
++	channel_frame(0x55f7, coded, frame);
++}
++
++bool m17_stream_frame(const uint8_t fragment[5], uint8_t index, uint16_t number,
++                      const uint8_t payload[16], uint8_t frame[M17_FRAME_BYTES])
++{
++	if (index >= 6) {
++		return false;
++	}
++	uint8_t lich[6], coded[46] = {0}, encoded[37] = {0};
++	uint8_t input[19] = {(uint8_t)(number >> 8), (uint8_t)number};
++	memcpy(lich, fragment, 5);
++	lich[5] = (uint8_t)(index << 5);
++	// First 96 channel bits before interleaving: four extended Golay words.
++	for (unsigned word = 0; word < 4; word++) {
++		unsigned data = 0;
++		for (unsigned b = 0; b < 12; b++) {
++			data = (data << 1) | bit(lich, 12 * word + b);
++		}
++		uint32_t codeword = fec_golay24_encode(data);
++		coded[3 * word] = codeword >> 16;
++		coded[3 * word + 1] = codeword >> 8;
++		coded[3 * word + 2] = (uint8_t)codeword;
++	}
++	memcpy(input + 2, payload, 16);
++	fec_conv_encode(&convolution, input, 148, encoded);
++	puncture(encoded, 296, coded, 96, false);
++	channel_frame(0xff5d, coded, frame);
++	return true;
++}
+diff --git a/core/m17/m17_frame.h b/core/m17/m17_frame.h
+new file mode 100644
+index 00000000..09fc80a0
+--- /dev/null
++++ b/core/m17/m17_frame.h
+@@ -0,0 +1,14 @@
++// SPDX-License-Identifier: MIT
++// Copyright (c) 2026 The RadioFoundry Authors
++#ifndef M17_FRAME_H
++#define M17_FRAME_H
++#include <stdbool.h>
++#include <stdint.h>
++
++#define M17_FRAME_BYTES 48   // 192 dibits, MSB first
++// The caller supplies 28 bytes of destination, source, TYPE and META.
++void m17_link_frame(const uint8_t link[28], uint8_t frame[M17_FRAME_BYTES]);
++// Five bytes of the CRC-completed link setup selected by index (0..5).
++bool m17_stream_frame(const uint8_t fragment[5], uint8_t index, uint16_t number,
++                      const uint8_t payload[16], uint8_t frame[M17_FRAME_BYTES]);
++#endif
+diff --git a/core/m17/m17_view.c b/core/m17/m17_view.c
+new file mode 100644
+index 00000000..bf409566
+--- /dev/null
++++ b/core/m17/m17_view.c
+@@ -0,0 +1,29 @@
++// SPDX-License-Identifier: MIT
++// Copyright (c) 2026 The RadioFoundry Authors
++#include "m17_frame.h"
++#include "debuglink/dl_fmt.h"
++
++// Raw bytes allow an independent host to compare every dibit.
++static void show_frame(dl_text_t *t, const char *key, const uint8_t *frame)
++{
++	static const char digits[] = "0123456789abcdef";
++	char hex[2 * M17_FRAME_BYTES + 1];
++	for (unsigned i = 0; i < M17_FRAME_BYTES; i++) {
++		hex[2 * i] = digits[frame[i] >> 4];
++		hex[2 * i + 1] = digits[frame[i] & 15];
++	}
++	hex[sizeof(hex) - 1] = 0;
++	dl_text(t, "%s=%s\n", key, hex);
++}
++
++void debuglink_view_m17(dl_text_t *t)
++{
++	// The lab's gr-m17 example: AB1CDE to AB2CDE, plain data, no META.
++	static const uint8_t link[28] = {0,0,0x1f,0x24,0x63,0x91, 0,0,0x1f,0x24,0x5d,0x51, 0,3};
++	static const uint8_t payload[16] = {0,0,0,0,0,0,0,0,0,1,2,3,4,5,6,0};
++	uint8_t frame[M17_FRAME_BYTES];
++	m17_link_frame(link, frame);
++	show_frame(t, "m17.lsf", frame);
++	m17_stream_frame(link, 0, 0, payload, frame);
++	show_frame(t, "m17.stream0", frame);
++}
+diff --git a/docs/spec/debuglink.md b/docs/spec/debuglink.md
+index 4b09faed..c83e8f52 100644
+--- a/docs/spec/debuglink.md
++++ b/docs/spec/debuglink.md
+@@ -379,6 +379,7 @@ short. View 5: the `cps.*` and `cpsf.*` keys moved from `storage` to `cps` (27),
+ | 36 | `p25` | P25 conventional on the channel ([p25.md](p25.md) 7.4): `p25.built` (0 without `CONFIG_P25`, and nothing else) `p25.on` (the engine runs on this channel), the call heard now or last `p25.rx played enc unit late nac src dst` (`src` 0: not known yet; `dst` a talk group, or a unit when `unit` is 1) `p25.tx` (`air_tx_state_t`: 0 idle, then priming, on, ending, done), `p25.rx_work_us rx_span_us` (while the engine runs, from a provider that counts its receive load, as `air.rx_work_us` in 3.28: work / span is the share of the CPU since P25 started), the settings `p25.rx_nac tx_nac rx_tgid talkaround unit_call tx_dst unit_id` (as op 39), while the engine runs the parameters it runs on `p25.run.rx_nac tx_nac rx_tgid talkaround unit_call tx_dst unit_id` (a stored P25 channel's own, else the settings; talkaround 1 on, 2 off), counters `p25.begins begin_fails mem_lent rx_calls tx_calls tx_filler units voice voice_bad voice_bits lc_fail es_fail rx_chunks tx_underruns tx_syms`; the voice path `p25v.built in frames bad concealed calls underruns underrun_at overflows bit_errors queue_max peak tx_frames tx_encoded tx_dropped tx_silent tx_mic_peak tx_mic_low_db` (`tx_mic_peak` after the mic gain and its limiter, `tx_mic_low_db` the limiter's lowest gain in the latest transmission, as `voice.tx_mic_low_db` in the `dmr` section; `p25v.built=0` without). RESET_COUNTERS zeroes the counters |
+ | 37 | `p25_trunk` | the P25 trunking follower on a trunked channel ([p25-trunking.md](p25-trunking.md) 7): `p25t.built` (0 without `CONFIG_P25_TRUNK`, and nothing else) `p25t.on` (a trunked channel runs), the follower's view `p25t.state` (`P25_FOLLOW_*`: 0 off, 1 hunting, 2 on a control channel, 3 on a voice channel) `cc cc_hz voice_hz nac wacn sysid rfss site` (the control channel tried or held and the system heard; `wacn` 4294967295, `sysid` 65535, `rfss`/`site` 255 until heard), the call followed now or last `tg src dst unit_call enc`, `idens learned refused refused_tg fallback`, counters `blocks crc_fail crc_taken mfr mbt mbt_op pdu_other grants follows enc_skip tdma no_iden wrong_sys hunts cc_lost voice_lost wrong_call` (from the channel's start; `crc_taken` the blocks taken with a failed CRC, the channel's Accept invalid CRC), `p25t.unverified` (1 while the last block taken failed it: the transmit side waits), and the radio core's `retunes untuned skips` (RESET_COUNTERS zeroes these three). The transmit side ([p25-trunking.md](p25-trunking.md) 5): `p25t.tx` (1: on), `reg` (`P25_REG_*`: 0 off, 1 idle, 2 waiting, 3 affiliating, 4 registered and affiliated, 5 denied, 6 retrying, 7 no inbound frequency), `req` (`P25_REQ_*`: 0 idle, 1 waiting, 2 queued, 3 talking on the grant, 4 denied, 5 no answer, 6 unusable channel), `aff_tg` (the group affiliated), `talk_hz` (where it last transmitted on a grant), `deny_svc deny_reason` (the last deny's request opcode and reason), counters `reg_tx reg_ok aff_tx aff_ok req_tx req_grant denials queued timeouts send_fail inb_busy` (8 bits, from the channel's start) and the radio core's `bursts burst_refused` (inbound bursts keyed, and refused by the transmit checks) |
+ | 38 | `nxdn` | NXDN conventional on the channel ([nxdn.md](nxdn.md) 6): `nxdn.built` (0 without `CONFIG_NXDN`, and nothing else) `nxdn.on` (the engine runs on this channel), the call heard now or last `nxdn.rx played enc unit late ran src dst emergency` (`src` 0: not known yet; `dst` a group, or a unit when `unit` is 1), `nxdn.tx` (`air_tx_state_t`: 0 idle, then priming, on, ending, done), `nxdn.deny` (`tx_deny_t` of the last refusal), the provider's fit (`AIR_FIT_*`, 3.28) at the rate in use and at each rate `nxdn.fit fit4800 fit9600`, the settings `nxdn.rate rx_ran tx_ran rx_gid unit_id unit_call tx_dst tx_emergency` (as op 40), while the engine runs the parameters it runs on `nxdn.run.rate rx_ran tx_ran rx_gid unit_id unit_call tx_dst` (a stored NXDN channel's own, [nxdn-codeplug.md](nxdn-codeplug.md), else the settings), counters `nxdn.begins begin_fails rx_calls tx_calls tx_filler frames lich_fail sacch_fail facch_fail voice voice_held fec_bits ran_rejects rx_chunks tx_underruns tx_syms`. The voice path is the DMR side's (`ambe.*` in `dmr_stats`). RESET_COUNTERS zeroes the counters |
++| 39 | `m17` | Optional `CONFIG_M17_FRAME_TEST`. Reading this section generates a link setup frame and stream frame 0000 in RAM. `m17.lsf` and `m17.stream0` contain 48 bytes each as hexadecimal packed dibits, most significant first. The generator has no modem output. |
+ 
+ With `CONFIG_KEY_ASSIGN` and at least one assignable key, `link` also reports `key.first.bit` (the first
+ `board.side_keys` entry, for KEY kind 1) and `key.first.press` (its saved `keyfn_t`, [ui.md](ui.md#31-key-assignment)).
+diff --git a/tests/hil/features.toml b/tests/hil/features.toml
+index e6124955..686535c5 100644
+--- a/tests/hil/features.toml
++++ b/tests/hil/features.toml
+@@ -602,3 +602,8 @@ source = ["core/debuglink/debuglink_air.c", "core/debuglink/debuglink_air.h"]
+ [feature.audio_probe]
+ switch = "AUDIO_PROBE"
+ spec = "docs/spec/usb-audio.md"
++
++[feature.m17_frame_test]
++switch = "M17_FRAME_TEST"
++spec = "docs/spec/debuglink.md"
++manual = ["Read the m17 view and compare both frame records with the reference capture."]
+diff --git a/tests/host/Makefile b/tests/host/Makefile
+index e7450cc4..f4a5f97f 100644
+--- a/tests/host/Makefile
++++ b/tests/host/Makefile
+@@ -237,7 +237,13 @@ APRSLIB := $(CORE)/aprs/ax25.c $(CORE)/aprs/hdlc.c $(CORE)/aprs/afsk.c $(CORE)/a
+ aprsTest: aprsTest.c $(APRSLIB) $(NMEALIB) $(wildcard $(CORE)/aprs/*.h)
+ 	$(CC) $(CFLAGS) -o $@ aprsTest.c $(APRSLIB) $(NMEALIB) -lm
+ 
++TESTS += m17FrameTest
++M17_SOURCES := $(CORE)/m17/m17_frame.c $(CORE)/m17/m17_view.c $(CORE)/fec/conv.c $(CORE)/fec/golay.c $(CORE)/debuglink/dl_fmt.c
++m17FrameTest: m17FrameTest.c $(M17_SOURCES) $(CORE)/m17/m17_frame.h $(CORE)/fec/conv.h $(CORE)/fec/golay.h $(CORE)/debuglink/dl_fmt.h
++	$(CC) $(CFLAGS) -o $@ m17FrameTest.c $(M17_SOURCES)
++
+ run: $(TESTS)
++	./m17FrameTest
+ 	./dmrFecTest
+ 	./dmrSoftBptcTest
+ 	./dmrSoftCombTest
+diff --git a/tests/host/m17FrameTest.c b/tests/host/m17FrameTest.c
+new file mode 100644
+index 00000000..60355256
+--- /dev/null
++++ b/tests/host/m17FrameTest.c
+@@ -0,0 +1,27 @@
++// SPDX-License-Identifier: MIT
++// Copyright (c) 2026 The RadioFoundry Authors
++#include "debuglink/dl_fmt.h"
++#include "m17/m17_frame.h"
++#include <assert.h>
++#include <stdio.h>
++#include <string.h>
++
++void debuglink_view_m17(dl_text_t *t);
++
++int main(void)
++{
++	// Byte-for-byte gr-m17 loopback capture at the lab's pinned reference revision.
++	static const char expected[] =
++		"m17.lsf=55f7d73562d0caf68d5afb0e8680cabacd670ec01653d10be876642333dc146adaf20d0dd286f5338713f318a92d59c3\n"
++		"m17.stream0=ff5dd7b4c230a25fe4c23a0f569991d8f55d0dd97273a15db86e782f3d9212a2c56e1191dd04c32197014598a92c7ec0\n";
++	char text[256];
++	dl_text_t t;
++	dl_text_init(&t, text, sizeof(text));
++	debuglink_view_m17(&t);
++	assert(!t.full && t.len == sizeof(expected) - 1);
++	assert(memcmp(text, expected, t.len) == 0);
++	uint8_t fragment[5] = {0}, payload[16] = {0}, frame[48] = {0};
++	assert(!m17_stream_frame(fragment, 6, 0, payload, frame));
++	puts("m17FrameTest: both captured frames matched");
++	return 0;
++}
+diff --git a/tools/rfoundry_debug.py b/tools/rfoundry_debug.py
+index 515808f0..782a25f1 100644
+--- a/tools/rfoundry_debug.py
++++ b/tools/rfoundry_debug.py
+@@ -203,7 +203,7 @@ PRESS, LONG, REPEAT, DOWN, UP = range(5)
+ VIEW_SECTIONS = ["core", "channel", "dmr", "dmr_call", "dmr_stats", "hotspot", "link", "features", "dmr_data",
+                  "storage", "dmr_ext", "dmr_data_stats", "roam", "aprs", "aprs_set", "dmr_ip", "net", "snmp", "usrp",
+                  "sfr", "tasks", "crash", "watchdog", "reset", "air", "net_svc", "net_link", "cps", "board", "audio", "t3",
+-                 "t3_svc", "t3_roam", "voice_cap", "t3_msg", "t3_ra", "p25", "p25_trunk", "nxdn"]
++                 "t3_svc", "t3_roam", "voice_cap", "t3_msg", "t3_ra", "p25", "p25_trunk", "nxdn", "m17"]
+ 
+ OP_CHANNEL_STEP, OP_ZONE_POS, OP_ZONE, OP_VFO, OP_VFO_SET, OP_VFO_STEP, OP_POWER, OP_SQUELCH, OP_BANDWIDTH, \
+     OP_TONE, OP_MONITOR, OP_CLEAR_TEMP, OP_REPLY_CANCEL, OP_HOTSPOT_EXIT, OP_DMR_TARGET, OP_DMR_CONTACT, \
+-- 
+2.53.0
+
