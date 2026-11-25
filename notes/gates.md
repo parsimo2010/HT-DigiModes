@@ -24,3 +24,5 @@ The [M17 frame-generator test build](dm1701-m17-frame-build.md) has its own priv
 ## LibreSDR receive path | 2026-11-25
 
 LAB-003 passed for the connected LibreSDR on USB 3 with the qualified FPGA image: channel 0 sustained 960 ksample/s for five seconds with zero drops, overruns and RX timeouts. [Image selection, exact hashes, commands and results](../hardware/libresdr/qualification.md). LAB-006 fixture verification and LAB-007 instrumented stock-radio captures remain open. The DM-1701 firmware and RF gates are unchanged.
+
+The [physical PTT test image and its sector-by-sector preview](dm1701-m17-ptt.md) passed the host radio-core and independent GNU Radio decoder tests. The DM-1701 to LibreSDR RF result is pending. The stock firmware is still installed.
