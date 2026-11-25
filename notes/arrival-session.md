@@ -29,12 +29,14 @@
 
 - The local CPS-only ZIP contained no image. The complete Radioddity V02.03 archive supplied CSV and noCSV images. The operator explicitly approved the CSV image and confirmed factory update mode, charged battery, USB cable and antenna.
 - `radio_tool` 0.5.1 identified the image as DM-1701. Its preview listed nine MCU application sectors starting at `0x0800C000` and skipped the external SPI resource segment. After checking that plan and the device's bootloader memory descriptor, reran `radio_tool flash --input 'DM-1701(CSV)-V02.03 Only for Radioddity.bin' --write`.
-- The writer reported nine erases, 869 KiB written, and exit 0. No bootloader or external SPI write was requested. USB sharing was removed and the private codeplug backup hash still matched. This is an updater result, not a firmware readback or proof of normal boot. Operator verification of boot, menu version, channel retention, and operation is pending.
+- The writer reported nine erases, 869 KiB written, and exit 0. No bootloader or external SPI write was requested. USB sharing was removed and the private codeplug backup hash still matched.
+- After restart, the operator confirmed the radio worked and the firmware menu read `V002.003`. This verifies Radioddity V02.03 CSV as a bootable stock fallback for this unit, not an exact copy of its previous `D012.006` firmware. No separate post-update mode-by-mode results or calibration readings were recorded.
+- The operator does not need to carry the original channels into M17. Keep the existing backup as an optional recovery asset.
 
 ## Remaining arrival checklist
 
 - DM-1701 exact marking/FCC ID (private attachment):
-- DM-1701 exact vendor recovery package and variant:
+- Second offline copy of the tested Radioddity V02.03 CSV package and its private checksum record:
 - DM-1801 exact marking/FCC ID (private attachment):
 - DM-1801 Pro board revision:
 - DM-1801 stock firmware version:

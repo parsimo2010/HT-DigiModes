@@ -4,7 +4,7 @@ A research lab to develop standalone M17 on a Baofeng DM-1701 and host-assisted 
 
 **Start here:** [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md) and [`AGENTS.md`](AGENTS.md).
 
-**Status:** The operator confirmed basic analog FM and DMR transmit and receive on both handhelds before any firmware change. The DM-1701 stock codeplug was backed up privately. The updater completed an approved write of Radioddity V02.03 CSV to the DM-1701. First boot and operation on V02.03 are pending operator verification. See the [arrival log](notes/arrival-session.md).
+**Status:** The operator confirmed that the DM-1701 boots and works after installing Radioddity V02.03 CSV. Its menu reports `V002.003`. This is the tested stock fallback for this unit. M17 has not been tested on the radio. See the [arrival log](notes/arrival-session.md).
 
 ## Host-only quick start
 
@@ -17,6 +17,6 @@ python3 -m unittest discover -s tests -v
 
 See the [factory backup checklist](docs/factory-backup.md) and [LibreSDR host inventory](docs/libresdr-inventory.md) for next steps. Keep backup artifacts and unit identifiers outside this public repository.
 
-**For Codex:** Follow the first-session task in section 12 of the plan. Do software-only setup and testing, then request measured hardware facts. Do not claim the plan has been executed.
+**Next session:** Start with the [M17 development handoff](notes/next-session.md). Keep the first work on the computer, with no radio writes or transmissions.
 
 **Upstream references:** <https://github.com/RadioFoundry/RadioFoundry>, <https://github.com/M17-Project/gr-m17>, <https://github.com/drowe67/radae>.

@@ -1,11 +1,11 @@
 # Codex/agent instructions — ham-digital-modes-lab
 
-Read `docs/DEVELOPMENT_PLAN.md` before making changes. Work in small, reviewable commits, with host-only tests first. This lab supports one DM-1701, one as-yet-unidentified DM-1801, a LibreSDR and a stock DR-1801UV.
+Read `docs/DEVELOPMENT_PLAN.md` before making changes. Work in small, reviewable commits, with host-only tests first. This lab supports one DM-1701, one operator-confirmed DM-1801 Pro with board revision still unverified, a LibreSDR and a stock DR-1801UV.
 
 ## Critical restrictions
 
 1. **No hardware-side actions without explicit human confirmation.** No flashing, bootloader erase, calibration writes, PTT/TX keying, RF gain/PA control, hardware probe that changes state, or raw serial control messages to a radio unless the user approves the exact command and device after safety checks.
-2. Assume a Kenwood-shaped two-pin socket is *not* a generic TTL UART. The DM-1701 accessory connector uses native USB; the current DM-1801 Pro uses UART0 (115200 8N1) with PTT pin interaction. The arriving DM-1801 version is UNVERIFIED. Do not select images or cabling until confirmed.
+2. Assume a Kenwood-shaped two-pin socket is *not* a generic TTL UART. The DM-1701 accessory connector uses native USB; the current DM-1801 Pro uses UART0 (115200 8N1) with PTT pin interaction. The operator identified the DM-1801 Pro, but its board revision and cable are unverified. Do not select images or cabling until confirmed.
 3. Preserve all factory firmware, codeplugs, calibration, codec and actual radio identifiers **outside Git**. No copyrighted binary redistribution or log of private IDs.
 4. Require RF containment: proper 50-ohm load, coupler/isolation, rated attenuator, verified power calculation and a human before transmitting; never feed RF power directly to an SDR input.
 5. Distinguish source-verified capabilities, bench-verified results, simulation and hypothesis in docs and tests. Do not turn an unverified mode into a claim of support.
@@ -19,6 +19,7 @@ Begin with the software-only, P0 tasks listed in `docs/DEVELOPMENT_PLAN.md`: inv
 
 ## Acceptance for every change
 
+- Use plain language for bench updates. Explain what happened, what it means for the radio, and what to do next. Define unfamiliar terms when needed.
 - Unit/host tests run; no radio required unless user separately opts in.
 - Instructions reproducible on a fresh Linux machine, with version and hash records.
 - Errors and uncertainty surfaced; no fake measurements or placeholder passes.
