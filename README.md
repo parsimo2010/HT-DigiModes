@@ -1,10 +1,10 @@
 # Ham Digital Modes Lab — Codex starter
 
-A research lab to develop standalone M17 on a Baofeng DM-1701 and host-assisted RADE BBFM on a verified compatible handheld, using a LibreSDR reference station. The incoming "DM-1801" hardware revision must be identified before any firmware or cable decisions.
+A research lab to develop standalone M17 on a Baofeng DM-1701 and host-assisted RADE BBFM on a verified compatible handheld, using a LibreSDR reference station. The second radio is confirmed as a DM-1801 Pro, but its board revision and cable still need verification.
 
 **Start here:** [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md) and [`AGENTS.md`](AGENTS.md).
 
-**Status:** Starter scaffolding. Windows enumerated the DM-1701 over USB, but no radio protocol, RF, or flash tests have been run. See the [arrival log](notes/arrival-session.md).
+**Status:** The operator confirmed basic analog FM and DMR transmit and receive on both handhelds. Windows enumerated the DM-1701 over USB. No protocol backup, firmware change, or instrumented RF measurement has been performed. See the [arrival log](notes/arrival-session.md).
 
 ## Host-only quick start
 

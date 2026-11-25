@@ -7,18 +7,24 @@
 - The check used only Windows Plug and Play inventory and its problem-code property. No radio software opened the device. No codeplug, firmware, or calibration was read or written. No unit-specific identifier is recorded here.
 - Radioddity's legacy STTub30 Windows driver package installed but failed to load (Code 39) and was removed. Ubuntu under WSL has qdmr/dmrconf 0.13.3 installed. The radio was not attached to WSL and no backup was attempted through it.
 
+## 2026-11-24 — Operator bench report
+
+- The operator confirmed transmit and receive in both analog FM and DMR on the DM-1701 and DM-1801 Pro. These are functional smoke tests, not instrumented RF measurements.
+- The DM-1701 is the active development target. Its normal menu reports firmware `D012.006` and CP version `V01.05`. The operator reported it powered on at its regular screen with native USB attached.
+- The second radio is confirmed as a DM-1801 Pro. Its board revision, cable and factory backup status remain unverified.
+- No codeplug, installed firmware or calibration backup has been captured yet.
+
 ## Remaining arrival checklist
 
 - DM-1701 exact marking/FCC ID (private attachment):
-- DM-1701 stock firmware version:
-- DM-1701 programming cable and USB ID:
+- DM-1701 exact vendor recovery package and variant:
 - DM-1801 exact marking/FCC ID (private attachment):
-- DM-1801 architecture decision (current HR_C7000 / original v1 / unknown): UNKNOWN
+- DM-1801 Pro board revision:
 - DM-1801 stock firmware version:
 - DM-1801 cable type / read-only serial result:
 - Factory codeplug backup status (keep artifact paths and hashes in the private manifest):
 - Firmware/codec/calibration backup status (keep artifact paths and hashes in the private manifest):
-- Stock FM/DMR results:
+- Instrumented RF baselines (separate from functional smoke tests):
 - LibreSDR UHD model / clock / FPGA image:
 - RF load / attenuators / coupler / input limit verified:
 - Unresolved blockers:
