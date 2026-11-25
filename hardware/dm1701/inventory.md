@@ -10,5 +10,6 @@
 | Analog FM and DMR baseline | Operator confirmed transmit and receive in both modes |
 | Stock codeplug | Binary backup saved privately, decoded offline, and SHA-256 verified |
 | Firmware and factory calibration backup | Not captured. The expected working calibration window in the codeplug dump was all zero |
+| Stock recovery package | Two V02.06 variants staged and hashes verified privately. Neither is confirmed to match the installed firmware |
 
 Keep serial numbers, radio IDs, label photos, and full USB instance paths in private storage outside the checkout.
