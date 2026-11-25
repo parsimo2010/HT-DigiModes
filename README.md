@@ -17,6 +17,6 @@ python3 -m unittest discover -s tests -v
 
 See the [factory backup checklist](docs/factory-backup.md) and [LibreSDR host inventory](docs/libresdr-inventory.md) for next steps. Keep backup artifacts and unit identifiers outside this public repository.
 
-**Next session:** Start with the [M17 development handoff](notes/next-session.md). Keep the first work on the computer, with no radio writes or transmissions.
+**DM-1701 development:** The [GNU Radio loopback and reference vectors](notes/m17-reference.md) and [pinned baseline build and host tests](notes/dm1701-build.md) passed on the computer. The [bench handoff](notes/dm1701-bench.md) records the exact offline memory preview and open SDR, RF and calibration gates.
 
 **Upstream references:** <https://github.com/RadioFoundry/RadioFoundry>, <https://github.com/M17-Project/gr-m17>, <https://github.com/drowe67/radae>.
