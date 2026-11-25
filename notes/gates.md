@@ -18,3 +18,5 @@ The operator confirmed basic FM/DMR operation before any change and separately a
 ## DM-1701 host evidence | 2026-11-24
 
 LAB-004, M17-001 and the local LAB-009 build passed on the computer. UHD is installed. LAB-003 device inventory, LAB-006 fixture verification, LAB-007 instrumented stock captures, factory calibration readback and LAB-008 on-radio validation remain open. The [exact offline erase/write preview and bench worksheet](dm1701-bench.md) cover the plain comparison build. The tested stock fallback is still installed. NOT RUN ON HARDWARE.
+
+The [M17 frame-generator test build](dm1701-m17-frame-build.md) has its own private DMR-codec-merged image, reproducible checksum and nine-sector offline write preview. Its read-only diagnostic passed in CPU emulation. Hardware gates remain open.
